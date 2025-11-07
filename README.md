@@ -8,6 +8,9 @@ Built on a robust Golang backend with a React frontend, Askara leverages OpenAI 
 
 - **Document Upload**: Support for PDF, .txt, .rtf, .docx, and .epub files
 - **AI-Powered Q&A**: Ask natural language questions and get accurate answers based on your documents
+- **Document Management**: View, manage, and delete uploaded documents with full metadata
+- **Usage Statistics**: Track total documents, chunks, and storage usage
+- **Real-Time Streaming**: Get AI responses in real-time with Server-Sent Events (SSE)
 - **Source Attribution**: See the specific file names and text snippets that inform each answer
 - **Vector Database Options**: Choose between Pinecone or Qdrant for vector storage
 - **Token Tracking**: Monitor OpenAI API usage with built-in token counting
@@ -77,18 +80,33 @@ Built on a robust Golang backend with a React frontend, Askara leverages OpenAI 
 4. OpenAI generates an answer using the retrieved context
 5. Answer is displayed with source attribution and token usage
 
+### Document Management Flow
+1. View all uploaded documents with metadata (filename, size, upload date, chunks)
+2. Monitor usage statistics (total documents, total chunks, total storage)
+3. Delete documents to remove both metadata and vector embeddings
+4. Real-time updates after upload or deletion operations
+
 ## 🏗️ Architecture
 
 - **Backend**: Golang web server (`vault-web-server/`)
 - **Frontend**: React with webpack bundling
 - **Vector DB**: Pluggable interface supporting Pinecone and Qdrant
+- **Document Storage**: JSON-based metadata store for document tracking
 - **Embeddings**: OpenAI ada-002 (1536 dimensions)
 - **Chunking**: Token-based chunking using tiktoken
+- **API**: RESTful endpoints for document CRUD operations
 
 ## 📝 API Endpoints
 
+### Document Operations
 - `POST /upload` - Upload and process documents
-- `POST /api/question` - Submit questions and get answers
+- `GET /api/documents?uuid={uuid}` - List all user documents
+- `DELETE /api/documents/{documentId}?uuid={uuid}` - Delete a specific document
+- `GET /api/documents/stats?uuid={uuid}` - Get usage statistics
+
+### Question Operations
+- `POST /api/questions` - Submit questions and get answers (non-streaming)
+- `POST /api/questions/stream` - Submit questions and get streaming answers
 
 See `vault-web-server/main.go` for full API documentation.
 
