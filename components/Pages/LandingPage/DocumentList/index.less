@@ -1,0 +1,316 @@
+.documentList {
+    margin-top: 40px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+
+    h3 {
+        margin: 0;
+        font-size: 24px;
+        color: #333;
+    }
+}
+
+.refreshButton {
+    padding: 8px 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+
+    &:hover:not(:disabled) {
+        background-color: #45a049;
+    }
+
+    &:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+    }
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 16px;
+}
+
+.error {
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    border-left: 4px solid #c62828;
+}
+
+.stats {
+    display: flex;
+    gap: 24px;
+    padding: 16px;
+    background: white;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.statItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.statLabel {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.statValue {
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
+}
+
+.empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+    font-size: 16px;
+    background: white;
+    border-radius: 6px;
+}
+
+.table {
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.tableHeader {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 0.8fr 0.6fr 0.8fr;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f5f5f5;
+    font-weight: 600;
+    font-size: 13px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.tableRow {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 0.8fr 0.6fr 0.8fr;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+
+    &:hover {
+        background-color: #fafafa;
+    }
+
+    &:last-child {
+        border-bottom: none;
+    }
+}
+
+.col1,
+.col2,
+.col3,
+.col4,
+.col5 {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+}
+
+.col1 {
+    font-weight: 500;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col2,
+.col3,
+.col4 {
+    color: #666;
+}
+
+.deleteBtn {
+    padding: 6px 14px;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background-color 0.3s;
+
+    &:hover:not(:disabled) {
+        background-color: #d32f2f;
+    }
+
+    &:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+    }
+}
+
+/* Modal styles */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+    h3 {
+        margin: 0 0 16px 0;
+        font-size: 20px;
+        color: #333;
+    }
+
+    p {
+        margin: 0 0 16px 0;
+        color: #666;
+        line-height: 1.5;
+    }
+}
+
+.documentInfo {
+    background: #f5f5f5;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+
+    strong {
+        display: block;
+        color: #333;
+        margin-bottom: 4px;
+    }
+}
+
+.documentMeta {
+    font-size: 13px;
+    color: #999;
+}
+
+.warning {
+    background: #fff3cd;
+    color: #856404;
+    padding: 12px;
+    border-radius: 4px;
+    border-left: 4px solid #ffc107;
+    font-size: 14px;
+}
+
+.modalButtons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.cancelButton {
+    padding: 10px 20px;
+    background-color: #e0e0e0;
+    color: #333;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.3s;
+
+    &:hover {
+        background-color: #d0d0d0;
+    }
+}
+
+.deleteButton {
+    padding: 10px 20px;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.3s;
+
+    &:hover {
+        background-color: #d32f2f;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .stats {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .table,
+    .tableHeader,
+    .tableRow {
+        display: block;
+    }
+
+    .tableHeader {
+        display: none;
+    }
+
+    .tableRow {
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+
+        & > div {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+
+            &:before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: #666;
+                text-transform: uppercase;
+                font-size: 12px;
+            }
+        }
+    }
+}

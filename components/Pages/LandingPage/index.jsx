@@ -4,6 +4,7 @@ import { useDropzone } from 'react-dropzone';
 import Page from '../../Page';
 import PostAPI from '../../Util/PostAPI';
 import Go from '../../Go';
+import DocumentList from './DocumentList';
 
 import s from './index.less';
 
@@ -278,6 +279,7 @@ const LandingPage = (props: Props): React.Node => {
                                 </div>
                             )}
                         </div>
+                        <DocumentList />
                     </div>
                 </div>
             </div>

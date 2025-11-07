@@ -245,9 +245,123 @@ const upload = {
     },
 };
 
+const documents = {
+    listDocuments: (): Promise<any> => {
+        const resultPromise = new Promise((resolve: any, reject: any) => {
+            const uuid = getOrCreateUUID();
+
+            const timeoutID = setTimeout(() => {
+                console.log('[/api/documents] Timeout');
+                reject(new Error('Timeout'));
+            }, API_TIMEOUT);
+
+            fetch(`/api/documents?uuid=${encodeURIComponent(uuid)}`, {
+                method: 'GET',
+            })
+                .then((res: any): any => {
+                    console.log(
+                        `[/api/documents RESPONSE] STAT: ${res.status} | OK: ${res.ok}`
+                    );
+                    clearTimeout(timeoutID);
+                    if (res.ok) return res.json();
+
+                    return res.text().then((text: string) => {
+                        throw new Error(res.status + ' | ' + text);
+                    });
+                })
+                .then((responseData: any) => {
+                    console.log('[/api/documents] Success', responseData);
+                    resolve(responseData);
+                })
+                .catch((err: Error): void => {
+                    console.log('[/api/documents] Error', err);
+                    reject(err);
+                });
+        });
+
+        return Promises.makeCancelable(resultPromise);
+    },
+
+    deleteDocument: (documentId: string): Promise<any> => {
+        const resultPromise = new Promise((resolve: any, reject: any) => {
+            const uuid = getOrCreateUUID();
+
+            const timeoutID = setTimeout(() => {
+                console.log('[/api/documents DELETE] Timeout');
+                reject(new Error('Timeout'));
+            }, API_TIMEOUT);
+
+            fetch(
+                `/api/documents/${encodeURIComponent(documentId)}?uuid=${encodeURIComponent(uuid)}`,
+                {
+                    method: 'DELETE',
+                }
+            )
+                .then((res: any): any => {
+                    console.log(
+                        `[/api/documents DELETE RESPONSE] STAT: ${res.status} | OK: ${res.ok}`
+                    );
+                    clearTimeout(timeoutID);
+                    if (res.ok) return res.json();
+
+                    return res.text().then((text: string) => {
+                        throw new Error(res.status + ' | ' + text);
+                    });
+                })
+                .then((responseData: any) => {
+                    console.log('[/api/documents DELETE] Success', responseData);
+                    resolve(responseData);
+                })
+                .catch((err: Error): void => {
+                    console.log('[/api/documents DELETE] Error', err);
+                    reject(err);
+                });
+        });
+
+        return Promises.makeCancelable(resultPromise);
+    },
+
+    getStats: (): Promise<any> => {
+        const resultPromise = new Promise((resolve: any, reject: any) => {
+            const uuid = getOrCreateUUID();
+
+            const timeoutID = setTimeout(() => {
+                console.log('[/api/documents/stats] Timeout');
+                reject(new Error('Timeout'));
+            }, API_TIMEOUT);
+
+            fetch(`/api/documents/stats?uuid=${encodeURIComponent(uuid)}`, {
+                method: 'GET',
+            })
+                .then((res: any): any => {
+                    console.log(
+                        `[/api/documents/stats RESPONSE] STAT: ${res.status} | OK: ${res.ok}`
+                    );
+                    clearTimeout(timeoutID);
+                    if (res.ok) return res.json();
+
+                    return res.text().then((text: string) => {
+                        throw new Error(res.status + ' | ' + text);
+                    });
+                })
+                .then((responseData: any) => {
+                    console.log('[/api/documents/stats] Success', responseData);
+                    resolve(responseData);
+                })
+                .catch((err: Error): void => {
+                    console.log('[/api/documents/stats] Error', err);
+                    reject(err);
+                });
+        });
+
+        return Promises.makeCancelable(resultPromise);
+    },
+};
+
 const PostAPI = {
     questions,
     upload,
+    documents,
 };
 
 export default PostAPI;

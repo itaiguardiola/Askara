@@ -1,6 +1,7 @@
 package postapi
 
 import (
+	"github.com/itaiguardiola/askara/storage"
 	"github.com/itaiguardiola/askara/vectordb"
 
 	cache "github.com/patrickmn/go-cache"
@@ -11,12 +12,14 @@ type HandlerContext struct {
 	openAIClient *openai.Client
 	cache        *cache.Cache
 	vectorDB     vectordb.VectorDB
+	docStore     storage.DocumentStore
 }
 
-func NewHandlerContext(openAIClient *openai.Client, vectorDB vectordb.VectorDB) *HandlerContext {
+func NewHandlerContext(openAIClient *openai.Client, vectorDB vectordb.VectorDB, docStore storage.DocumentStore) *HandlerContext {
 	return &HandlerContext{
 		openAIClient: openAIClient,
 		cache:        cache.New(cache.NoExpiration, cache.NoExpiration),
 		vectorDB:     vectorDB,
+		docStore:     docStore,
 	}
 }

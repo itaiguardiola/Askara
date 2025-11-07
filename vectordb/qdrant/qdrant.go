@@ -123,6 +123,12 @@ func (q *Qdrant) CreateNamespace(uuid string) error {
 }
 
 func (q *Qdrant) UpsertEmbeddings(embeddings [][]float32, chunks []chunk.Chunk, uuid string) error {
+	// For backward compatibility, use timestamp-based doc ID
+	docID := fmt.Sprintf("doc-%d", time.Now().UnixNano())
+	return q.UpsertEmbeddingsWithDocID(embeddings, chunks, uuid, docID)
+}
+
+func (q *Qdrant) UpsertEmbeddingsWithDocID(embeddings [][]float32, chunks []chunk.Chunk, uuid string, docID string) error {
 	if err := q.CreateNamespace(uuid); err != nil {
 		return err
 	}
@@ -134,10 +140,13 @@ func (q *Qdrant) UpsertEmbeddings(embeddings [][]float32, chunks []chunk.Chunk, 
 		points[i].Vector = embedding
 		if i < len(chunks) {
 			points[i].Payload = map[string]string{
-				"start": fmt.Sprintf("%d", chunks[i].Start),
-				"end":   fmt.Sprintf("%d", chunks[i].End),
-				"title": chunks[i].Title,
-				"text":  chunks[i].Text,
+				"uuid":      uuid,
+				"doc_id":    docID,
+				"start":     fmt.Sprintf("%d", chunks[i].Start),
+				"end":       fmt.Sprintf("%d", chunks[i].End),
+				"title":     chunks[i].Title,
+				"text":      chunks[i].Text,
+				"file_name": chunks[i].Title,
 			}
 		}
 	}
@@ -218,4 +227,114 @@ func (q *Qdrant) Retrieve(questionEmbedding []float32, topK int, uuid string) ([
 	}
 
 	return queryMatches, nil
+}
+
+// DeleteByDocumentID deletes all points associated with a document ID
+func (q *Qdrant) DeleteByDocumentID(docID string, uuid string) error {
+	// Delete points by filter
+	data := map[string]interface{}{
+		"filter": map[string]interface{}{
+			"must": []map[string]interface{}{
+				{
+					"key": "doc_id",
+					"match": map[string]string{
+						"value": docID,
+					},
+				},
+				{
+					"key": "uuid",
+					"match": map[string]string{
+						"value": uuid,
+					},
+				},
+			},
+		},
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal delete request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/collections/%s/points/delete", q.Endpoint, uuid), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create delete request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send delete request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body := make([]byte, 1024)
+		_, _ = resp.Body.Read(body)
+		return fmt.Errorf("delete failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// ListDocumentIDs lists all unique document IDs in a collection
+func (q *Qdrant) ListDocumentIDs(uuid string) ([]string, error) {
+	// Use scroll to get all points
+	data := map[string]interface{}{
+		"limit":        100,
+		"with_payload": true,
+		"with_vector":  false,
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal scroll request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/collections/%s/points/scroll", q.Endpoint, uuid), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scroll request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send scroll request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body := make([]byte, 1024)
+		_, _ = resp.Body.Read(body)
+		return nil, fmt.Errorf("scroll failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Result struct {
+			Points []struct {
+				Payload map[string]string `json:"payload"`
+			} `json:"points"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode scroll response: %w", err)
+	}
+
+	// Extract unique doc_ids
+	docIDMap := make(map[string]bool)
+	for _, point := range result.Result.Points {
+		if docID, ok := point.Payload["doc_id"]; ok {
+			docIDMap[docID] = true
+		}
+	}
+
+	docIDs := make([]string, 0, len(docIDMap))
+	for docID := range docIDMap {
+		docIDs = append(docIDs, docID)
+	}
+
+	return docIDs, nil
 }

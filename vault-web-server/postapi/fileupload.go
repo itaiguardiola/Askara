@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/itaiguardiola/askara/chunk"
+	"github.com/itaiguardiola/askara/storage"
 	openai "github.com/sashabaranov/go-openai"
 )
 
 type UploadResponse struct {
-	Message             string            `json:"message"`
-	NumFilesSucceeded   int               `json:"num_files_succeeded"`
-	NumFilesFailed      int               `json:"num_files_failed"`
-	SuccessfulFileNames []string          `json:"successful_file_names"`
-	FailedFileNames     map[string]string `json:"failed_file_names"`
+	Message             string                 `json:"message"`
+	NumFilesSucceeded   int                    `json:"num_files_succeeded"`
+	NumFilesFailed      int                    `json:"num_files_failed"`
+	SuccessfulFileNames []string               `json:"successful_file_names"`
+	FailedFileNames     map[string]string      `json:"failed_file_names"`
+	UploadedDocuments   []storage.Document     `json:"uploaded_documents"`
 }
 
 const MAX_FILE_SIZE int64 = 25 << 20         // 3 MB
@@ -54,6 +57,7 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 	responseData := UploadResponse{
 		SuccessfulFileNames: make([]string, 0),
 		FailedFileNames:     make(map[string]string),
+		UploadedDocuments:   make([]storage.Document, 0),
 	}
 
 	for _, file := range files {
@@ -131,7 +135,11 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 		fmt.Printf("Total embeddings: %d\n", len(embeddings))
 		fmt.Printf("Embeddings length: %d\n", len(embeddings[0]))
 
-		err = ctx.vectorDB.UpsertEmbeddings(embeddings, chunks, uuid)
+		// Generate document ID
+		docID := storage.GenerateDocumentID(fileName)
+
+		// Upsert with document ID
+		err = ctx.vectorDB.UpsertEmbeddingsWithDocID(embeddings, chunks, uuid, docID)
 		if err != nil {
 			errMsg := fmt.Sprintf("Error upserting embeddings to vector DB: %v", err)
 			log.Println("[UploadHandler ERR]", errMsg)
@@ -142,8 +150,27 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 
 		log.Println("Successfully added vector DB embeddings!")
 
+		// Save document metadata
+		doc := storage.Document{
+			ID:           docID,
+			UUID:         uuid,
+			Filename:     fileName,
+			FileSize:     file.Size,
+			UploadDate:   time.Now(),
+			ChunkCount:   len(chunks),
+			ContentType:  fileType,
+			FirstChunkID: storage.GenerateChunkID(uuid, docID, 0),
+			LastChunkID:  storage.GenerateChunkID(uuid, docID, len(chunks)-1),
+		}
+
+		if err := ctx.docStore.SaveDocument(&doc); err != nil {
+			log.Printf("[UploadHandler WARN] Failed to save document metadata: %v", err)
+			// Continue anyway - the vectors are uploaded
+		}
+
 		responseData.NumFilesSucceeded++
 		responseData.SuccessfulFileNames = append(responseData.SuccessfulFileNames, fileName)
+		responseData.UploadedDocuments = append(responseData.UploadedDocuments, doc)
 	}
 
 	if responseData.NumFilesFailed > 0 {
