@@ -10,10 +10,18 @@ services:
     ports:
       - "8100:8100"
     environment:
-      # OpenAI Configuration
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # LLM Provider Selection
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+
+      # OpenAI Configuration (only needed if LLM_PROVIDER=openai)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-ada-002}
+
+      # Ollama Configuration (only needed if LLM_PROVIDER=ollama)
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
+      - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
 
       # Vector Database Configuration
       - QDRANT_API_ENDPOINT=${QDRANT_API_ENDPOINT:-http://qdrant:6333}
@@ -37,6 +45,9 @@ services:
     restart: unless-stopped
     networks:
       - askara-network
+    extra_hosts:
+      # Enable access to host machine for Ollama connectivity
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8100/"]
       interval: 30s
