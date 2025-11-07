@@ -1,0 +1,68 @@
+version: '3.8'
+
+# Windows-specific Docker Compose configuration
+# This file extends docker-compose.yml with Windows-specific settings
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.windows.yml up
+
+services:
+  # Askara Web Application (Windows variant)
+  askara-web:
+    environment:
+      # Use host.docker.internal to access services running on Windows host
+      # This allows connection to Ollama running on the Windows host machine
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+
+      # For Windows Docker Desktop, use host.docker.internal
+      # For older Docker versions, use the gateway IP
+      - QDRANT_API_ENDPOINT=${QDRANT_API_ENDPOINT:-http://qdrant:6333}
+
+    # Windows-specific volume mounts
+    volumes:
+      # Use Windows paths with forward slashes or escape backslashes
+      # Example: C:/Users/YourName/Askara/data or C:\\Users\\YourName\\Askara\\data
+      - ${ASKARA_DATA_PATH:-./data}:/app/data
+      - ${ASKARA_DOCUMENTS_PATH:-./data/documents}:/app/data/documents
+
+    # Enable access to host network for Ollama connectivity
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Windows networking considerations
+    networks:
+      - askara-network
+
+  # Qdrant Vector Database (Windows variant)
+  qdrant:
+    # Windows-specific volume mount
+    volumes:
+      - ${QDRANT_STORAGE_PATH:-qdrant-storage}:/qdrant/storage
+
+    # Windows networking
+    networks:
+      - askara-network
+
+    # Optimize for Windows file system
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=${QDRANT_LOG_LEVEL:-INFO}
+
+networks:
+  askara-network:
+    driver: bridge
+
+volumes:
+  qdrant-storage:
+    driver: local
+
+# Notes for Windows users:
+# 1. Make sure Docker Desktop is installed and running
+# 2. Enable WSL 2 backend in Docker Desktop settings for best performance
+# 3. If using Ollama on Windows host:
+#    - Install Ollama on Windows: https://ollama.ai/download
+#    - Start Ollama: ollama serve
+#    - Pull a model: ollama pull llama2
+#    - The container will connect via host.docker.internal:11434
+# 4. For Windows paths in .env file, use forward slashes:
+#    ASKARA_DATA_PATH=C:/Users/YourName/Askara/data
+# 5. To use Qdrant running on host instead of container:
+#    Set QDRANT_API_ENDPOINT=http://host.docker.internal:6333

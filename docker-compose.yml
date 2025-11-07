@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Askara Web Application
+  askara-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: askara-web
+    ports:
+      - "8100:8100"
+    environment:
+      # OpenAI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-ada-002}
+
+      # Vector Database Configuration
+      - QDRANT_API_ENDPOINT=${QDRANT_API_ENDPOINT:-http://qdrant:6333}
+
+      # Optional: Pinecone Configuration (alternative to Qdrant)
+      - PINECONE_API_ENDPOINT=${PINECONE_API_ENDPOINT:-}
+      - PINECONE_API_KEY=${PINECONE_API_KEY:-}
+
+      # Application Configuration
+      - PORT=${PORT:-8100}
+      - DEBUG_SITE=${DEBUG_SITE:-false}
+
+    volumes:
+      # Persist document data
+      - ./data:/app/data
+      # Persist uploaded documents
+      - askara-documents:/app/data/documents
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - askara-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8100/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: askara-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    networks:
+      - askara-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  # Named volume for Qdrant data persistence
+  qdrant-storage:
+    driver: local
+
+  # Named volume for document storage
+  askara-documents:
+    driver: local
+
+networks:
+  askara-network:
+    driver: bridge

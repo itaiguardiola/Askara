@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Node modules
+node_modules
+npm-debug.log
+
+# Compiled output
+bin/
+static/js/
+
+# Data and secrets
+data/
+secret/
+
+# Documentation
+*.md
+TESTING.md
+LICENSE
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Test files
+*_test.go
+scripts/test-*.sh
+
+# Temporary files
+*.tmp
+*.log
