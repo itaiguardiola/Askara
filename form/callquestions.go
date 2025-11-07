@@ -7,9 +7,9 @@ import (
 
 type QuestionForm struct {
 	Question string `schema:"question"`
-	Model    string `schema:model`
-	UUID     string `schema:uuid`
-	ApiKey   string `schema:apikey`
+	Model    string `schema:"model"`
+	UUID     string `schema:"uuid"`
+	ApiKey   string `schema:"apikey"`
 }
 
 func (me *QuestionForm) Validate() errorlist.Errors {
