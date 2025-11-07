@@ -104,6 +104,33 @@ Adjust `MAX_FILE_SIZE` and `MAX_TOTAL_UPLOAD_SIZE` as needed.
 ### Vector Database
 Switch between Pinecone and Qdrant by modifying the initialization in `vault-web-server/main.go`.
 
+## 🧪 Testing
+
+Askara includes comprehensive tests for both backend and integration testing.
+
+### Running Tests
+
+**Backend unit tests:**
+```bash
+go test ./vault-web-server/postapi
+```
+
+**Integration tests:**
+```bash
+# Start the server first
+npm start
+
+# In another terminal, run integration tests
+./scripts/test-streaming.sh
+```
+
+**With coverage:**
+```bash
+go test -cover ./vault-web-server/postapi
+```
+
+See [TESTING.md](TESTING.md) for detailed testing documentation.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
