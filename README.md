@@ -13,10 +13,45 @@ Built on a robust Golang backend with a React frontend, Askara leverages OpenAI 
 - **Real-Time Streaming**: Get AI responses in real-time with Server-Sent Events (SSE)
 - **Source Attribution**: See the specific file names and text snippets that inform each answer
 - **Vector Database Options**: Choose between Pinecone or Qdrant for vector storage
+- **Local & Cloud Deployment**: Run with Ollama (free, local) or OpenAI (cloud)
 - **Token Tracking**: Monitor OpenAI API usage with built-in token counting
 - **User-Friendly Interface**: Drag-and-drop file uploads with a clean React UI
 
 ## 🚀 Quick Start
+
+### Option 1: Local Deployment with Docker (Recommended for Windows + Ollama)
+
+**Perfect for**: Windows users with RTX 3090, privacy-focused deployments, zero API costs
+
+See **[WINDOWS_SETUP.md](WINDOWS_SETUP.md)** for complete step-by-step instructions.
+
+Quick start:
+```bash
+# 1. Install Ollama and pull models
+ollama serve
+ollama pull llama2
+ollama pull nomic-embed-text
+
+# 2. Clone and configure
+git clone https://github.com/itaiguardiola/Askara.git
+cd Askara
+cp .env.example .env
+
+# 3. Start with Docker Compose (Windows)
+docker-compose -f docker-compose.yml -f docker-compose.windows.yml up -d
+
+# Access at http://localhost:8100
+```
+
+Benefits:
+- ✅ **Free**: No API costs with local Ollama models
+- ✅ **Private**: Data never leaves your machine
+- ✅ **Fast**: RTX 3090 optimized for local inference
+- ✅ **Simple**: One command deployment
+
+### Option 2: Cloud Deployment with OpenAI
+
+**Perfect for**: Production use, managed infrastructure, proven scalability
 
 ### Prerequisites
 
