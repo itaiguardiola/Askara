@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/itaiguardiola/askara/form"
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/itaiguardiola/askara/llm"
 )
 
 type Context struct {
@@ -34,16 +34,28 @@ func (ctx *HandlerContext) QuestionHandler(w http.ResponseWriter, r *http.Reques
 	log.Println("[QuestionHandler] UUID:", form.UUID)
 	log.Println("[QuestionHandler] ApiKey:", form.ApiKey)
 
-	clientToUse := ctx.openAIClient
+	providerToUse := ctx.llmProvider
 	if form.ApiKey != "" {
-		log.Println("[QuestionHandler] Using provided custom API key:", form.ApiKey)
-		clientToUse = openai.NewClient(form.ApiKey)
+		log.Println("[QuestionHandler] Using provided custom API key")
+		// Create temporary OpenAI provider with custom key
+		customProvider, err := llm.NewProvider(&llm.Config{
+			Provider: "openai",
+			OpenAIConfig: &llm.OpenAIConfig{
+				APIKey: form.ApiKey,
+			},
+		})
+		if err != nil {
+			log.Println("[QuestionHandler ERR] Failed to create custom provider:", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		providerToUse = customProvider
 	}
 
-	// step 1: Feed question to openai embeddings api to get an embedding back
-	questionEmbedding, err := getEmbedding(clientToUse, form.Question, openai.AdaEmbeddingV2)
+	// step 1: Feed question to LLM to get an embedding back
+	questionEmbedding, err := providerToUse.GenerateEmbedding(form.Question)
 	if err != nil {
-		log.Println("[QuestionHandler ERR] OpenAI get embedding request error\n", err.Error())
+		log.Println("[QuestionHandler ERR] LLM get embedding request error\n", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -72,36 +84,21 @@ func (ctx *HandlerContext) QuestionHandler(w http.ResponseWriter, r *http.Reques
 	for i, context := range contexts {
 		contextTexts[i] = context.Text
 	}
-	prompt, err := buildPrompt(contextTexts, form.Question)
-	if prompt == "" {
-		prompt = form.Question
-	}
+
+	log.Printf("[QuestionHandler] Sending LLM api request for question: %s\n", form.Question)
+	llmResponse, err := providerToUse.GenerateCompletion(form.Question, contextTexts)
+
 	if err != nil {
-		log.Println("[QuestionHandler ERR] Error building prompt\n", err.Error())
+		log.Println("[QuestionHandler ERR] LLM answer questions request error\n", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	model := openai.GPT3Dot5Turbo
-	if form.Model == "GPT Davinci" {
-		model = openai.GPT3TextDavinci003
-	}
+	log.Println("[QuestionHandler] LLM response:\n", llmResponse)
+	// Note: Token counting is not supported in the LLM interface for all providers
+	tokens := 0
 
-	log.Printf("[QuestionHandler] Sending OpenAI api request...\nPrompt:%s\n", prompt)
-	openAIResponse, tokens, err := callOpenAI(clientToUse, prompt, model,
-		"You are a helpful assistant answering questions based on the context provided.",
-		512)
-
-	if err != nil {
-		log.Println("[QuestionHandler ERR] OpenAI answer questions request error\n", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	log.Println("[QuestionHandler] OpenAI response:\n", openAIResponse)
-	response := OpenAIResponse{openAIResponse, tokens}
-
-	answer := Answer{response.Response, contexts, response.Tokens}
+	answer := Answer{llmResponse, contexts, tokens}
 	jsonResponse, err := json.Marshal(answer)
 	if err != nil {
 		log.Println("[QuestionHandler ERR] OpenAI response marshalling error", err)
@@ -137,16 +134,29 @@ func (ctx *HandlerContext) StreamingQuestionHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	clientToUse := ctx.openAIClient
+	providerToUse := ctx.llmProvider
 	if form.ApiKey != "" {
 		log.Println("[StreamingQuestionHandler] Using provided custom API key")
-		clientToUse = openai.NewClient(form.ApiKey)
+		// Create temporary OpenAI provider with custom key
+		customProvider, err := llm.NewProvider(&llm.Config{
+			Provider: "openai",
+			OpenAIConfig: &llm.OpenAIConfig{
+				APIKey: form.ApiKey,
+			},
+		})
+		if err != nil {
+			log.Println("[StreamingQuestionHandler ERR] Failed to create custom provider:", err.Error())
+			fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+			flusher.Flush()
+			return
+		}
+		providerToUse = customProvider
 	}
 
-	// step 1: Feed question to openai embeddings api to get an embedding back
-	questionEmbedding, err := getEmbedding(clientToUse, form.Question, openai.AdaEmbeddingV2)
+	// step 1: Feed question to LLM to get an embedding back
+	questionEmbedding, err := providerToUse.GenerateEmbedding(form.Question)
 	if err != nil {
-		log.Println("[StreamingQuestionHandler ERR] OpenAI get embedding request error\n", err.Error())
+		log.Println("[StreamingQuestionHandler ERR] LLM get embedding request error\n", err.Error())
 		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
 		flusher.Flush()
 		return
@@ -184,53 +194,22 @@ func (ctx *HandlerContext) StreamingQuestionHandler(w http.ResponseWriter, r *ht
 	for i, context := range contexts {
 		contextTexts[i] = context.Text
 	}
-	prompt, err := buildPrompt(contextTexts, form.Question)
-	if prompt == "" {
-		prompt = form.Question
-	}
-	if err != nil {
-		log.Println("[StreamingQuestionHandler ERR] Error building prompt\n", err.Error())
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
-		flusher.Flush()
-		return
-	}
 
-	model := openai.GPT3Dot5Turbo
-	if form.Model == "GPT Davinci" {
-		model = openai.GPT3TextDavinci003
-	}
-
-	// Streaming parameters
-	temperature := float32(0.7)
-	topP := float32(1.0)
-	frequencyPenalty := float32(0.0)
-	presencePenalty := float32(0.6)
-	stop := []string{"Human:", "AI:"}
-
-	log.Printf("[StreamingQuestionHandler] Sending OpenAI streaming request...\n")
+	log.Printf("[StreamingQuestionHandler] Sending LLM streaming request...\n")
 
 	// Use streaming API
-	err = useChatCompletionStreamAPI(
-		clientToUse,
-		prompt,
-		model,
-		"You are a helpful assistant answering questions based on the context provided.",
-		temperature,
-		512,
-		topP,
-		frequencyPenalty,
-		presencePenalty,
-		stop,
-		func(chunk string) error {
+	err = providerToUse.StreamCompletion(
+		form.Question,
+		contextTexts,
+		func(chunk string) {
 			// Send each chunk as an SSE message
 			fmt.Fprintf(w, "event: chunk\ndata: %s\n\n", chunk)
 			flusher.Flush()
-			return nil
 		},
 	)
 
 	if err != nil {
-		log.Println("[StreamingQuestionHandler ERR] OpenAI streaming error\n", err.Error())
+		log.Println("[StreamingQuestionHandler ERR] LLM streaming error\n", err.Error())
 		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
 		flusher.Flush()
 		return

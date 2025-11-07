@@ -8,18 +8,18 @@ import (
 	"time"
 
 	"github.com/itaiguardiola/askara/chunk"
+	"github.com/itaiguardiola/askara/llm"
 	"github.com/itaiguardiola/askara/storage"
 	"github.com/itaiguardiola/askara/validator"
-	openai "github.com/sashabaranov/go-openai"
 )
 
 type UploadResponse struct {
-	Message             string                 `json:"message"`
-	NumFilesSucceeded   int                    `json:"num_files_succeeded"`
-	NumFilesFailed      int                    `json:"num_files_failed"`
-	SuccessfulFileNames []string               `json:"successful_file_names"`
-	FailedFileNames     map[string]string      `json:"failed_file_names"`
-	UploadedDocuments   []storage.Document     `json:"uploaded_documents"`
+	Message             string             `json:"message"`
+	NumFilesSucceeded   int                `json:"num_files_succeeded"`
+	NumFilesFailed      int                `json:"num_files_failed"`
+	SuccessfulFileNames []string           `json:"successful_file_names"`
+	FailedFileNames     map[string]string  `json:"failed_file_names"`
+	UploadedDocuments   []storage.Document `json:"uploaded_documents"`
 }
 
 const MAX_FILE_SIZE int64 = 25 << 20         // 3 MB
@@ -56,10 +56,22 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 
 	log.Println("[UploadHandler] UUID=", uuid)
 
-	clientToUse := ctx.openAIClient
+	providerToUse := ctx.llmProvider
 	if userProvidedOpenApiKey != "" {
-		log.Println("[UploadHandler] Using provided custom API key:", userProvidedOpenApiKey)
-		clientToUse = openai.NewClient(userProvidedOpenApiKey)
+		log.Println("[UploadHandler] Using provided custom API key")
+		// Create temporary OpenAI provider with custom key
+		customProvider, err := llm.NewProvider(&llm.Config{
+			Provider: "openai",
+			OpenAIConfig: &llm.OpenAIConfig{
+				APIKey: userProvidedOpenApiKey,
+			},
+		})
+		if err != nil {
+			log.Println("[UploadHandler ERR] Failed to create custom provider:", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		providerToUse = customProvider
 	}
 
 	responseData := UploadResponse{
@@ -131,12 +143,24 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 			continue
 		}
 
-		embeddings, err := getEmbeddings(clientToUse, chunks, 100, openai.AdaEmbeddingV2)
-		if err != nil {
-			errMsg := fmt.Sprintf("Error getting embeddings: %v", err)
-			log.Println("[UploadHandler ERR]", errMsg)
-			responseData.NumFilesFailed++
-			responseData.FailedFileNames[fileName] = errMsg
+		// Generate embeddings for each chunk using LLM provider
+		embeddings := make([][]float32, 0, len(chunks))
+		embeddingError := false
+		for _, c := range chunks {
+			embedding, err := providerToUse.GenerateEmbedding(c.Text)
+			if err != nil {
+				errMsg := fmt.Sprintf("Error getting embeddings: %v", err)
+				log.Println("[UploadHandler ERR]", errMsg)
+				responseData.NumFilesFailed++
+				responseData.FailedFileNames[fileName] = errMsg
+				embeddingError = true
+				break
+			}
+			embeddings = append(embeddings, embedding)
+		}
+
+		// Skip this file if embedding generation failed
+		if embeddingError {
 			continue
 		}
 		fmt.Printf("Total chunks: %d\n", len(chunks))

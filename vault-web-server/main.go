@@ -16,6 +16,7 @@ import (
 	"compress/gzip"
 	"io"
 
+	"github.com/itaiguardiola/askara/llm"
 	"github.com/itaiguardiola/askara/serverutil"
 	"github.com/itaiguardiola/askara/storage"
 	"github.com/itaiguardiola/askara/vectordb"
@@ -23,8 +24,6 @@ import (
 	"github.com/itaiguardiola/askara/vectordb/qdrant"
 
 	"github.com/itaiguardiola/askara/vault-web-server/postapi"
-
-	openai "github.com/sashabaranov/go-openai"
 
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
@@ -52,14 +51,15 @@ func main() {
 	siteConfig["DEBUG_SITE"] = strconv.FormatBool(*debugSite)
 	rand.Seed(time.Now().UnixNano())
 
-	openaiApiKey := os.Getenv("OPENAI_API_KEY")
-	if len(openaiApiKey) == 0 {
-		log.Fatalln("MISSING OPENAI API KEY ENV VARIABLE")
+	// Initialize LLM provider (supports OpenAI or Ollama based on env vars)
+	var err error
+	llmProvider, err := llm.NewProviderFromEnv()
+	if err != nil {
+		log.Fatalln("ERROR INITIALIZING LLM PROVIDER:", err)
 	}
-	openaiClient := openai.NewClient(openaiApiKey)
+	log.Println("LLM provider initialized successfully")
 
 	var vectorDB vectordb.VectorDB
-	var err error
 
 	qdrantApiEndpoint := os.Getenv("QDRANT_API_ENDPOINT")
 	if len(qdrantApiEndpoint) != 0 {
@@ -92,7 +92,7 @@ func main() {
 		log.Fatalln("ERROR INITIALIZING DOCUMENT STORE:", err)
 	}
 
-	handlerContext := postapi.NewHandlerContext(openaiClient, vectorDB, docStore)
+	handlerContext := postapi.NewHandlerContext(llmProvider, vectorDB, docStore)
 
 	// Configure main web server
 	server := negroni.New()
