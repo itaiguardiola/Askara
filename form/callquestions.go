@@ -1,8 +1,8 @@
 package form
 
 import (
-	"github.com/pashpashpash/vault/errorlist"
-	"github.com/pashpashpash/vault/validator"
+	"github.com/itaiguardiola/askara/errorlist"
+	"github.com/itaiguardiola/askara/validator"
 )
 
 type QuestionForm struct {

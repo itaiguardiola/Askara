@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/schema"
-	"github.com/pashpashpash/vault/errorlist"
-	"github.com/pashpashpash/vault/form"
+	"github.com/itaiguardiola/askara/errorlist"
+	"github.com/itaiguardiola/askara/form"
 )
 
 // Util: does grunt work of decoding + verifying form + writing errors back

@@ -4,7 +4,7 @@ import (
 	"net/mail"
 	"regexp"
 
-	"github.com/pashpashpash/vault/errorlist"
+	"github.com/itaiguardiola/askara/errorlist"
 )
 
 const SPECIAL_DELETE_ASCII string = "\x10"

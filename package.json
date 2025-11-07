@@ -1,8 +1,8 @@
 {
-  "name": "vault-web-server",
+  "name": "askara",
   "private": true,
   "version": "1.0.0",
-  "description": "vault core website",
+  "description": "Askara - AI-Powered Knowledge Base (based on OP Vault by pashpashpash)",
   "main": "index.js",
   "scripts": {
     "start": "bash -c 'source ./scripts/source-me.sh && ./scripts/go-compile.sh ./vault-web-server && echo && ./bin/vault-web-server'",
@@ -11,14 +11,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pashpashpash/vault.git"
+    "url": "git+https://github.com/itaiguardiola/Askara.git"
   },
-  "author": "pashpashpash",
+  "author": "itaiguardiola (based on OP Vault by pashpashpash)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/pashpashpash/vault/issues"
+    "url": "https://github.com/itaiguardiola/Askara/issues"
   },
-  "homepage": "https://github.com/pashpashpash/vault#readme",
+  "homepage": "https://github.com/itaiguardiola/Askara#readme",
   "dependencies": {
     "@babel/plugin-transform-runtime": "^7.21.4",
     "crypto-browserify": "^3.12.0",

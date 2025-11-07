@@ -1,4 +1,4 @@
-module github.com/pashpashpash/vault
+module github.com/itaiguardiola/askara
 
 go 1.17
 

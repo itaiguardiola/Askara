@@ -1,6 +1,6 @@
 package form
 
-import "github.com/pashpashpash/vault/errorlist"
+import "github.com/itaiguardiola/askara/errorlist"
 
 type Form interface {
 	Validate() errorlist.Errors

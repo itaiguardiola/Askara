@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pashpashpash/vault/chunk"
-	"github.com/pashpashpash/vault/vectordb"
+	"github.com/itaiguardiola/askara/chunk"
+	"github.com/itaiguardiola/askara/vectordb"
 	cache "github.com/patrickmn/go-cache"
 )
 

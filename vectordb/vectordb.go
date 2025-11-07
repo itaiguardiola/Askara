@@ -1,7 +1,7 @@
 package vectordb
 
 import (
-	"github.com/pashpashpash/vault/chunk"
+	"github.com/itaiguardiola/askara/chunk"
 )
 
 type QueryMatch struct {

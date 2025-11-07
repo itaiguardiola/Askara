@@ -16,12 +16,12 @@ import (
 	"compress/gzip"
 	"io"
 
-	"github.com/pashpashpash/vault/serverutil"
-	"github.com/pashpashpash/vault/vectordb"
-	"github.com/pashpashpash/vault/vectordb/pinecone"
-	"github.com/pashpashpash/vault/vectordb/qdrant"
+	"github.com/itaiguardiola/askara/serverutil"
+	"github.com/itaiguardiola/askara/vectordb"
+	"github.com/itaiguardiola/askara/vectordb/pinecone"
+	"github.com/itaiguardiola/askara/vectordb/qdrant"
 
-	"github.com/pashpashpash/vault/vault-web-server/postapi"
+	"github.com/itaiguardiola/askara/vault-web-server/postapi"
 
 	openai "github.com/sashabaranov/go-openai"
 

@@ -3,7 +3,7 @@ package validator
 import (
 	"strings"
 
-	"github.com/pashpashpash/vault/errorlist"
+	"github.com/itaiguardiola/askara/errorlist"
 )
 
 type Validator interface {

@@ -1,7 +1,7 @@
 package getapi
 
 import (
-	"github.com/pashpashpash/vault/serverutil"
+	"github.com/itaiguardiola/askara/serverutil"
 )
 
 var (

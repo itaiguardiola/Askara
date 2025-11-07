@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/pashpashpash/vault/form"
+	"github.com/itaiguardiola/askara/form"
 	openai "github.com/sashabaranov/go-openai"
 )
 

@@ -22,10 +22,10 @@ const Footer = (props: Props): React.Node => {
                         <div className={s.linkRow}>
                             <div className={s.socialButtons}></div>
                             <div className={s.linkColumn}>
-                                <div className={s.linkHeader}>Vault</div>
+                                <div className={s.linkHeader}>Askara</div>
                                 <Go
                                     to={'/'}
-                                    data-action={'vault-home'}
+                                    data-action={'askara-home'}
                                     data-category={'footer-link'}>
                                     Home
                                 </Go>
@@ -47,8 +47,7 @@ const Footer = (props: Props): React.Node => {
                             />
 
                             <span>
-                                © pashpashpash {new Date().getFullYear()} All
-                                Rights Reserved.
+                                Based on OP Vault by pashpashpash. Modified and maintained by itaiguardiola © {new Date().getFullYear()}
                             </span>
                         </div>
                     </div>
