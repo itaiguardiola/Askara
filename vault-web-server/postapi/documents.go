@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/itaiguardiola/askara/storage"
+	"github.com/itaiguardiola/askara/validator"
 )
 
 // DocumentListResponse represents the response for listing documents
@@ -32,6 +33,13 @@ func (ctx *HandlerContext) ListDocumentsHandler(w http.ResponseWriter, r *http.R
 	if uuid == "" {
 		log.Println("[ListDocumentsHandler ERR] Missing UUID parameter")
 		http.Error(w, "Missing UUID parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Validate UUID format to prevent injection attacks
+	if err := validator.ValidateUUID(uuid); err != nil {
+		log.Printf("[ListDocumentsHandler ERR] Invalid UUID: %v", err)
+		http.Error(w, fmt.Sprintf("Invalid UUID format: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -72,9 +80,23 @@ func (ctx *HandlerContext) DeleteDocumentHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Validate UUID format
+	if err := validator.ValidateUUID(uuid); err != nil {
+		log.Printf("[DeleteDocumentHandler ERR] Invalid UUID: %v", err)
+		http.Error(w, fmt.Sprintf("Invalid UUID format: %v", err), http.StatusBadRequest)
+		return
+	}
+
 	if docID == "" {
 		log.Println("[DeleteDocumentHandler ERR] Missing document ID")
 		http.Error(w, "Missing document ID", http.StatusBadRequest)
+		return
+	}
+
+	// Validate document ID format
+	if err := validator.ValidateDocumentID(docID); err != nil {
+		log.Printf("[DeleteDocumentHandler ERR] Invalid document ID: %v", err)
+		http.Error(w, fmt.Sprintf("Invalid document ID format: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -132,6 +154,13 @@ func (ctx *HandlerContext) GetDocumentStatsHandler(w http.ResponseWriter, r *htt
 	if uuid == "" {
 		log.Println("[GetDocumentStatsHandler ERR] Missing UUID parameter")
 		http.Error(w, "Missing UUID parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Validate UUID format
+	if err := validator.ValidateUUID(uuid); err != nil {
+		log.Printf("[GetDocumentStatsHandler ERR] Invalid UUID: %v", err)
+		http.Error(w, fmt.Sprintf("Invalid UUID format: %v", err), http.StatusBadRequest)
 		return
 	}
 

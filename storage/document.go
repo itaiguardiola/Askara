@@ -5,12 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/itaiguardiola/askara/validator"
 )
 
 // Document represents metadata about an uploaded document
@@ -68,11 +69,19 @@ func NewJSONDocumentStore(basePath string) (*JSONDocumentStore, error) {
 }
 
 // GenerateDocumentID creates a unique document ID based on filename and timestamp
+// This function is deprecated in favor of validator.GenerateSecureDocumentID
+// but kept for backward compatibility
 func GenerateDocumentID(filename string) string {
-	timestamp := time.Now().UnixNano()
-	data := fmt.Sprintf("%s-%d", filename, timestamp)
-	hash := sha256.Sum256([]byte(data))
-	return fmt.Sprintf("doc-%s", hex.EncodeToString(hash[:8]))
+	// Use the secure version from validator package
+	docID, err := validator.GenerateSecureDocumentID(filename)
+	if err != nil {
+		// Fallback to timestamp-based (should rarely happen)
+		timestamp := time.Now().UnixNano()
+		data := fmt.Sprintf("%s-%d", filename, timestamp)
+		hash := sha256.Sum256([]byte(data))
+		return fmt.Sprintf("doc-%s", hex.EncodeToString(hash[:8]))
+	}
+	return docID
 }
 
 // GenerateChunkID creates a vector ID for a chunk
@@ -81,20 +90,38 @@ func GenerateChunkID(uuid, docID string, chunkIndex int) string {
 }
 
 // getUserFilePath returns the path to a user's document metadata file
-func (s *JSONDocumentStore) getUserFilePath(uuid string) string {
-	return filepath.Join(s.basePath, fmt.Sprintf("%s.json", uuid))
+// Returns empty string and logs error if UUID is invalid or path traversal is detected
+func (s *JSONDocumentStore) getUserFilePath(uuid string) (string, error) {
+	// Validate UUID format
+	if err := validator.ValidateUUID(uuid); err != nil {
+		return "", fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	// Construct the file path
+	filename := fmt.Sprintf("%s.json", uuid)
+	requestedPath := filepath.Join(s.basePath, filename)
+
+	// Validate path to prevent traversal
+	if err := validator.ValidatePath(s.basePath, requestedPath); err != nil {
+		return "", fmt.Errorf("path validation failed: %w", err)
+	}
+
+	return requestedPath, nil
 }
 
 // loadUserDocuments loads documents for a user from their JSON file
 func (s *JSONDocumentStore) loadUserDocuments(uuid string) (*userDocuments, error) {
-	filePath := s.getUserFilePath(uuid)
+	filePath, err := s.getUserFilePath(uuid)
+	if err != nil {
+		return nil, err
+	}
 
 	// If file doesn't exist, return empty structure
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return &userDocuments{Documents: []Document{}}, nil
 	}
 
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read document file: %w", err)
 	}
@@ -109,14 +136,17 @@ func (s *JSONDocumentStore) loadUserDocuments(uuid string) (*userDocuments, erro
 
 // saveUserDocuments saves documents for a user to their JSON file
 func (s *JSONDocumentStore) saveUserDocuments(uuid string, docs *userDocuments) error {
-	filePath := s.getUserFilePath(uuid)
+	filePath, err := s.getUserFilePath(uuid)
+	if err != nil {
+		return err
+	}
 
 	data, err := json.MarshalIndent(docs, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal documents: %w", err)
 	}
 
-	if err := ioutil.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write document file: %w", err)
 	}
 

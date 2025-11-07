@@ -9,6 +9,7 @@ import (
 
 	"github.com/itaiguardiola/askara/chunk"
 	"github.com/itaiguardiola/askara/storage"
+	"github.com/itaiguardiola/askara/validator"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -46,6 +47,13 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 	uuid := r.FormValue("uuid") // Get the UUID from the form data
 	userProvidedOpenApiKey := r.FormValue("apikey")
 
+	// Validate UUID
+	if err := validator.ValidateUUID(uuid); err != nil {
+		log.Println("[UploadHandler ERR] Invalid UUID:", err)
+		http.Error(w, "Invalid UUID format", http.StatusBadRequest)
+		return
+	}
+
 	log.Println("[UploadHandler] UUID=", uuid)
 
 	clientToUse := ctx.openAIClient
@@ -61,7 +69,7 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	for _, file := range files {
-		fileName := file.Filename
+		fileName := validator.SanitizeFilename(file.Filename)
 
 		if file.Size > MAX_FILE_SIZE {
 			errMsg := fmt.Sprintf("File size exceeds the %d bytes limit", MAX_FILE_SIZE)
@@ -179,8 +187,8 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 		responseData.Message = "All files uploaded and processed successfully"
 	}
 
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	jsonResponse, err := json.Marshal(responseData)
 	if err != nil {
 		log.Println("[UploadHandler ERR] Error writing json response", err)
