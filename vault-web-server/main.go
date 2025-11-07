@@ -98,6 +98,7 @@ func main() {
 
 	// Path Routing Rules: [POST]
 	mx.HandleFunc("/api/questions", handlerContext.QuestionHandler).Methods("POST")
+	mx.HandleFunc("/api/questions/stream", handlerContext.StreamingQuestionHandler).Methods("POST")
 	mx.HandleFunc("/upload", handlerContext.UploadHandler).Methods("POST")
 
 	// Path Routing Rules: Static Handlers

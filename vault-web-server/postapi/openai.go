@@ -87,6 +87,63 @@ func useChatCompletionAPI(client *openai.Client, prompt, modelParam string, inst
 	return resp.Choices[0].Message.Content, resp.Usage.TotalTokens, nil
 }
 
+// StreamHandler is used to handle streaming chunks
+type StreamHandler func(chunk string) error
+
+func useChatCompletionStreamAPI(client *openai.Client, prompt, modelParam string, instructions string, temperature float32, maxTokens int, topP float32, frequencyPenalty, presencePenalty float32, stop []string, handler StreamHandler) error {
+	messages := []openai.ChatCompletionMessage{
+		{
+			Role:    "system",
+			Content: instructions,
+		},
+		{
+			Role:    openai.ChatMessageRoleUser,
+			Content: prompt,
+		},
+	}
+
+	ctx := context.Background()
+	stream, err := client.CreateChatCompletionStream(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model:            modelParam,
+			Messages:         messages,
+			Temperature:      temperature,
+			MaxTokens:        maxTokens,
+			TopP:             topP,
+			FrequencyPenalty: frequencyPenalty,
+			PresencePenalty:  presencePenalty,
+			Stop:             stop,
+			Stream:           true,
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	for {
+		response, err := stream.Recv()
+		if err != nil {
+			// Check if stream is done
+			if err.Error() == "EOF" {
+				return nil
+			}
+			return err
+		}
+
+		if len(response.Choices) > 0 {
+			chunk := response.Choices[0].Delta.Content
+			if chunk != "" {
+				if err := handler(chunk); err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
 func useCompletionAPI(client *openai.Client, prompt, modelParam string,
 	temperature float32, maxTokens int, topP float32,
 	frequencyPenalty, presencePenalty float32,

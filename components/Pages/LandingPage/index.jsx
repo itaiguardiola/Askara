@@ -37,10 +37,11 @@ const ContextSnippet = ({ context, index }) => {
     );
 };
 
-const ResponseDisplay = ({ response }) => {
-    if (!response) return null;
-    
-    const renderedMarkdown = marked(response.answer);
+const ResponseDisplay = ({ response, streamingAnswer }) => {
+    if (!response && !streamingAnswer) return null;
+
+    const answerToDisplay = streamingAnswer || (response ? response.answer : '');
+    const renderedMarkdown = marked(answerToDisplay);
 
     return (
         <div className={s.responseDisplay}>
@@ -48,15 +49,17 @@ const ResponseDisplay = ({ response }) => {
                 className={s.answer}
                 dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
             />
-            <div className={s.contexts}>
-                {response.context.map((context, index) => (
-                    <ContextSnippet
-                        key={index}
-                        context={context}
-                        index={index}
-                    />
-                ))}
-            </div>
+            {response && response.context && response.context.length > 0 && (
+                <div className={s.contexts}>
+                    {response.context.map((context, index) => (
+                        <ContextSnippet
+                            key={index}
+                            context={context}
+                            index={index}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -68,6 +71,8 @@ const LandingPage = (props: Props): React.Node => {
     const [errorMessage, setErrorMessage] = useState('');
     const [response, setResponse] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [streamingAnswer, setStreamingAnswer] = useState('');
+    const [useStreaming, setUseStreaming] = useState(true);
 
     React.useEffect(() => {}, []);
 
@@ -75,23 +80,58 @@ const LandingPage = (props: Props): React.Node => {
         // Perform question submission here
         // Set loading state to true
         setLoading(true);
+        setErrorMessage('');
+        setStreamingAnswer('');
         console.log('Asking question:', question);
 
-        PostAPI.questions
-            .submitQuestion(question, 'GPT Turbo')
-            .promise.then((response) => {
-                console.log('Response:', response);
-                setResponse(response);
-                setLoading(false);
-            })
-            .catch((error) => {
-                console.log('Error asking question:', error);
-                setErrorMessage(
-                    error ? JSON.stringify(error) : 'Error asking question'
-                );
-                setResponse(null);
-                setLoading(false);
-            });
+        if (useStreaming) {
+            // Use streaming API
+            let contextData = [];
+            PostAPI.questions
+                .submitQuestionStream(
+                    question,
+                    'GPT Turbo',
+                    (chunk) => {
+                        // Append each chunk to the streaming answer
+                        setStreamingAnswer((prev) => prev + chunk);
+                    },
+                    (context) => {
+                        // Set context data when received
+                        contextData = context;
+                        setResponse({ answer: '', context: contextData, tokens: 0 });
+                    }
+                )
+                .promise.then(() => {
+                    console.log('Streaming completed');
+                    setLoading(false);
+                })
+                .catch((error) => {
+                    console.log('Error asking question:', error);
+                    setErrorMessage(
+                        error ? error.message || JSON.stringify(error) : 'Error asking question'
+                    );
+                    setResponse(null);
+                    setStreamingAnswer('');
+                    setLoading(false);
+                });
+        } else {
+            // Use regular non-streaming API
+            PostAPI.questions
+                .submitQuestion(question, 'GPT Turbo')
+                .promise.then((response) => {
+                    console.log('Response:', response);
+                    setResponse(response);
+                    setLoading(false);
+                })
+                .catch((error) => {
+                    console.log('Error asking question:', error);
+                    setErrorMessage(
+                        error ? JSON.stringify(error) : 'Error asking question'
+                    );
+                    setResponse(null);
+                    setLoading(false);
+                });
+        }
     };
 
 	React.useEffect(() => {
@@ -173,16 +213,27 @@ const LandingPage = (props: Props): React.Node => {
                                 placeholder="Enter your question here..."
                                 className={s.textarea}
                             />
-                            <button
-                                onClick={handleAskQuestion}
-                                disabled={loading || !question}
-                                className={
-                                    loading
-                                        ? s.askQuestionDisabled
-                                        : s.askQuestion
-                                }>
-                                Submit
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                                <button
+                                    onClick={handleAskQuestion}
+                                    disabled={loading || !question}
+                                    className={
+                                        loading
+                                            ? s.askQuestionDisabled
+                                            : s.askQuestion
+                                    }>
+                                    Submit
+                                </button>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={useStreaming}
+                                        onChange={(e) => setUseStreaming(e.target.checked)}
+                                        disabled={loading}
+                                    />
+                                    <span>Enable Streaming</span>
+                                </label>
+                            </div>
                             {loading && <div className={s.loader} />}
                         </div>
                         {response?.tokens && (
@@ -193,7 +244,12 @@ const LandingPage = (props: Props): React.Node => {
                                 </span>
                             </div>
                         )}
-                        {response && <ResponseDisplay response={response} />}
+                        {(response || streamingAnswer) && (
+                            <ResponseDisplay
+                                response={response}
+                                streamingAnswer={streamingAnswer}
+                            />
+                        )}
                         <div style={{ height: 32 }} />
                         <div className={s.fileList}>
                             {uploadedFiles.length > 0 && (

@@ -90,6 +90,105 @@ const questions = {
 
         return Promises.makeCancelable(resultPromise);
     },
+
+    submitQuestionStream: (
+        question: string,
+        model: string,
+        onChunk: (chunk: string) => void,
+        onContext: (context: any) => void
+    ): Promise<any> => {
+        const resultPromise = new Promise((resolve: any, reject: any) => {
+            var data = new FormData();
+            data.append('question', question);
+            data.append('model', model);
+            data.append('apikey', getCustomOpenAPIKey());
+
+            const uuid = getOrCreateUUID();
+            data.append('uuid', uuid);
+
+            fetch('/api/questions/stream', {
+                method: 'POST',
+                body: data,
+            })
+                .then((res: any) => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    let currentEvent = '';
+
+                    const processText = ({
+                        done,
+                        value,
+                    }: {
+                        done: boolean,
+                        value?: Uint8Array,
+                    }) => {
+                        if (done) {
+                            console.log('[Stream] Completed');
+                            resolve({ answer: '', context: [] });
+                            return;
+                        }
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+
+                        // Keep the last incomplete line in the buffer
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (line.trim() === '') {
+                                currentEvent = '';
+                                continue;
+                            }
+
+                            if (line.startsWith('event:')) {
+                                currentEvent = line.substring(6).trim();
+                                continue;
+                            }
+
+                            if (line.startsWith('data:')) {
+                                const data = line.substring(5).trim();
+
+                                if (currentEvent === 'chunk') {
+                                    onChunk(data);
+                                } else if (currentEvent === 'context') {
+                                    try {
+                                        const contextData = JSON.parse(data);
+                                        onContext(contextData);
+                                    } catch (err) {
+                                        console.error(
+                                            'Error parsing context:',
+                                            err
+                                        );
+                                    }
+                                } else if (currentEvent === 'done') {
+                                    console.log('[Stream] Done event received');
+                                    resolve({ answer: '', context: [] });
+                                    return;
+                                } else if (currentEvent === 'error') {
+                                    reject(new Error(data));
+                                    return;
+                                }
+                            }
+                        }
+
+                        reader.read().then(processText);
+                    };
+
+                    reader.read().then(processText);
+                })
+                .catch((err: Error) => {
+                    console.log('[/api/questions/stream] Error:', err);
+                    reject(err);
+                });
+        });
+
+        return Promises.makeCancelable(resultPromise);
+    },
 };
 
 const upload = {
