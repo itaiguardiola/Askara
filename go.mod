@@ -10,6 +10,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/schema v1.2.0
 	github.com/neurosnap/sentences v1.1.2
+	github.com/otiai10/gosseract/v2 v2.2.4
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkoukk/tiktoken-go v0.1.0
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d

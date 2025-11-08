@@ -17,6 +17,8 @@ import (
 	"io"
 
 	"github.com/itaiguardiola/askara/llm"
+	"github.com/itaiguardiola/askara/mlworker"
+	"github.com/itaiguardiola/askara/queryrewriter"
 	"github.com/itaiguardiola/askara/serverutil"
 	"github.com/itaiguardiola/askara/storage"
 	"github.com/itaiguardiola/askara/vectordb"
@@ -92,7 +94,19 @@ func main() {
 		log.Fatalln("ERROR INITIALIZING DOCUMENT STORE:", err)
 	}
 
-	handlerContext := postapi.NewHandlerContext(llmProvider, vectorDB, docStore)
+	// Initialize ML Worker client
+	mlworker.InitGlobalClient()
+
+	// Initialize Query Rewriter (uses local Ollama by default)
+	queryRewriteEnabled := os.Getenv("QUERY_REWRITE_ENABLED") == "true"
+	queryRewriter := queryrewriter.NewQueryRewriter(llmProvider, queryRewriteEnabled)
+	if queryRewriteEnabled {
+		log.Println("[QueryRewriter] Enabled - queries will be expanded using local LLM for better retrieval")
+	} else {
+		log.Println("[QueryRewriter] Disabled - set QUERY_REWRITE_ENABLED=true to enable")
+	}
+
+	handlerContext := postapi.NewHandlerContext(llmProvider, vectorDB, docStore, queryRewriter)
 
 	// Configure main web server
 	server := negroni.New()
@@ -107,10 +121,13 @@ func main() {
 	mx.HandleFunc("/api/questions", handlerContext.QuestionHandler).Methods("POST")
 	mx.HandleFunc("/api/questions/stream", handlerContext.StreamingQuestionHandler).Methods("POST")
 	mx.HandleFunc("/upload", handlerContext.UploadHandler).Methods("POST")
+	mx.HandleFunc("/api/config/test", handlerContext.TestConnectionHandler).Methods("POST")
 
 	// Path Routing Rules: [GET]
 	mx.HandleFunc("/api/documents", handlerContext.ListDocumentsHandler).Methods("GET")
 	mx.HandleFunc("/api/documents/stats", handlerContext.GetDocumentStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/config", handlerContext.GetConfigHandler).Methods("GET")
+	mx.HandleFunc("/api/config/ollama/models", handlerContext.ListOllamaModelsHandler).Methods("GET")
 
 	// Path Routing Rules: [DELETE]
 	mx.HandleFunc("/api/documents/{documentId}", handlerContext.DeleteDocumentHandler).Methods("DELETE")

@@ -7,20 +7,24 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // ConfigResponse represents the current configuration
 type ConfigResponse struct {
-	LLMProvider      string   `json:"llm_provider"`
-	OpenAIModel      string   `json:"openai_model,omitempty"`
-	OpenAIEmbedding  string   `json:"openai_embedding,omitempty"`
-	OllamaHost       string   `json:"ollama_host,omitempty"`
-	OllamaModel      string   `json:"ollama_model,omitempty"`
-	OllamaEmbedding  string   `json:"ollama_embedding,omitempty"`
-	VectorDB         string   `json:"vector_db"`
-	QdrantEndpoint   string   `json:"qdrant_endpoint,omitempty"`
-	PineconeEndpoint string   `json:"pinecone_endpoint,omitempty"`
-	Port             string   `json:"port"`
+	LLMProvider       string   `json:"llm_provider"`
+	OpenAIModel       string   `json:"openai_model,omitempty"`
+	OpenAIEmbedding   string   `json:"openai_embedding,omitempty"`
+	OllamaHost        string   `json:"ollama_host,omitempty"`
+	OllamaModel       string   `json:"ollama_model,omitempty"`
+	OllamaEmbedding   string   `json:"ollama_embedding,omitempty"`
+	VectorDB          string   `json:"vector_db"`
+	QdrantEndpoint    string   `json:"qdrant_endpoint,omitempty"`
+	PineconeEndpoint  string   `json:"pinecone_endpoint,omitempty"`
+	MLWorkerEnabled   bool     `json:"ml_worker_enabled"`
+	MLWorkerEndpoint  string   `json:"ml_worker_endpoint,omitempty"`
+	MLWorkerFeatures  []string `json:"ml_worker_features,omitempty"`
+	Port              string   `json:"port"`
 }
 
 // OllamaModel represents a model available in Ollama
@@ -71,7 +75,21 @@ func (ctx *HandlerContext) GetConfigHandler(w http.ResponseWriter, r *http.Reque
 		OllamaHost:       getEnv("OLLAMA_HOST", ""),
 		OllamaModel:      getEnv("OLLAMA_MODEL", ""),
 		OllamaEmbedding:  getEnv("OLLAMA_EMBEDDING_MODEL", ""),
+		MLWorkerEnabled:  getEnv("ML_WORKER_ENABLED", "false") == "true",
+		MLWorkerEndpoint: getEnv("ML_WORKER_ENDPOINT", "http://192.168.0.250:6161/askara"),
 		Port:             getEnv("PORT", "8100"),
+	}
+
+	// Parse ML Worker features
+	if config.MLWorkerEnabled {
+		featuresStr := getEnv("ML_WORKER_FEATURES", "ocr,enhance,caption")
+		features := make([]string, 0)
+		for _, f := range splitAndTrim(featuresStr, ",") {
+			if f != "" {
+				features = append(features, f)
+			}
+		}
+		config.MLWorkerFeatures = features
 	}
 
 	// Determine vector DB
@@ -141,6 +159,8 @@ func (ctx *HandlerContext) TestConnectionHandler(w http.ResponseWriter, r *http.
 		result = testQdrantConnection(req.Endpoint)
 	case "pinecone":
 		result = testPineconeConnection(req.Endpoint, req.APIKey)
+	case "mlworker":
+		result = testMLWorkerConnection(req.Endpoint)
 	default:
 		result = ConnectionTestResponse{
 			Success: false,
@@ -284,4 +304,46 @@ func testPineconeConnection(endpoint, apiKey string) ConnectionTestResponse {
 		Success: true,
 		Message: "Connected to Pinecone successfully",
 	}
+}
+
+func testMLWorkerConnection(endpoint string) ConnectionTestResponse {
+	if endpoint == "" {
+		endpoint = getEnv("ML_WORKER_ENDPOINT", "http://192.168.0.250:6161/askara")
+	}
+
+	url := endpoint + "/"
+	resp, err := http.Get(url)
+	if err != nil {
+		return ConnectionTestResponse{
+			Success: false,
+			Message: "Failed to connect to ML Worker",
+			Details: err.Error(),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return ConnectionTestResponse{
+			Success: false,
+			Message: "ML Worker returned an error",
+			Details: string(body),
+		}
+	}
+
+	return ConnectionTestResponse{
+		Success: true,
+		Message: "Connected to ML Worker successfully",
+	}
+}
+
+func splitAndTrim(s, sep string) []string {
+	parts := make([]string, 0)
+	for _, part := range strings.Split(s, sep) {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
 }

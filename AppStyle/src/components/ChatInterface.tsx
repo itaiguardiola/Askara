@@ -207,7 +207,7 @@ export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
                       : ''
                   }`}
                 >
-                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                  <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
                   <p
                     className={`text-xs mt-2 ${
                       message.role === 'user'

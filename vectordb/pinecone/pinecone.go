@@ -171,6 +171,13 @@ func (p *Pinecone) Retrieve(questionEmbedding []float32, topK int, uuid string) 
 	return nil, nil
 }
 
+// HybridSearch implements hybrid search (vector + FTS)
+// Note: Pinecone doesn't have native FTS, so this falls back to vector-only search
+func (p *Pinecone) HybridSearch(vectorQuery []float32, textQuery string, topK int, uuid string) ([]vectordb.QueryMatch, error) {
+	log.Printf("[Pinecone] HybridSearch not supported, falling back to vector-only search")
+	return p.Retrieve(vectorQuery, topK, uuid)
+}
+
 // DeleteByDocumentID deletes all vectors associated with a document ID
 func (p *Pinecone) DeleteByDocumentID(docID string, uuid string) error {
 	url := p.Endpoint + "/vectors/delete"

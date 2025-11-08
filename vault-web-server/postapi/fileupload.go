@@ -133,6 +133,24 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 		}
 		log.Printf("File Name: %s, File Type: %s, File Content (first 32 characters): %s\n", fileName, fileType, filePreview)
 
+		// Compute content hash for deduplication
+		contentHash := storage.ComputeContentHash(fileContent)
+		log.Printf("[UploadHandler] Content hash for %s: %s", fileName, contentHash)
+
+		// Check if this content already exists for this user
+		existingDoc, err := ctx.docStore.(*storage.JSONDocumentStore).FindDocumentByContentHash(uuid, contentHash)
+		if err != nil {
+			log.Printf("[UploadHandler WARN] Error checking for duplicates: %v", err)
+			// Continue with upload even if duplicate check fails
+		} else if existingDoc != nil {
+			// Duplicate file found
+			log.Printf("[UploadHandler] Duplicate file detected: %s (original: %s)", fileName, existingDoc.Filename)
+			responseData.NumFilesFailed++
+			responseData.FailedFileNames[fileName] = fmt.Sprintf("Duplicate content (same as '%s' uploaded on %s)",
+				existingDoc.Filename, existingDoc.UploadDate.Format("2006-01-02 15:04:05"))
+			continue
+		}
+
 		// Process the fileBytes into embeddings and store in vector DB here
 		chunks, err := chunk.CreateChunks(fileContent, fileName)
 		if err != nil {
@@ -188,6 +206,7 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 			UUID:         uuid,
 			Filename:     fileName,
 			FileSize:     file.Size,
+			ContentHash:  contentHash,
 			UploadDate:   time.Now(),
 			ChunkCount:   len(chunks),
 			ContentType:  fileType,

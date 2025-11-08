@@ -14,6 +14,7 @@ type VectorDB interface {
 	UpsertEmbeddings(embeddings [][]float32, chunks []chunk.Chunk, uuid string) error
 	UpsertEmbeddingsWithDocID(embeddings [][]float32, chunks []chunk.Chunk, uuid string, docID string) error
 	Retrieve(questionEmbedding []float32, topK int, uuid string) ([]QueryMatch, error)
+	HybridSearch(vectorQuery []float32, textQuery string, topK int, uuid string) ([]QueryMatch, error)
 	DeleteByDocumentID(docID string, uuid string) error
 	ListDocumentIDs(uuid string) ([]string, error)
 }

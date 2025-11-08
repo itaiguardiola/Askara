@@ -28,7 +28,8 @@ const (
 var uuidRegex = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$`)
 
 // Document ID validation regex (doc-[hexstring])
-var docIDRegex = regexp.MustCompile(`^doc-[a-f0-9]{16}$`)
+// 16 bytes = 32 hex characters
+var docIDRegex = regexp.MustCompile(`^doc-[a-f0-9]{32}$`)
 
 // ValidateUUID checks if a UUID string is valid according to RFC 4122
 func ValidateUUID(uuid string) error {
@@ -61,7 +62,9 @@ func ValidateDocumentID(docID string) error {
 	}
 
 	if !docIDRegex.MatchString(docID) {
-		return fmt.Errorf("%w: must match format 'doc-[hexstring]'", ErrInvalidDocumentID)
+		// Debug logging
+		fmt.Printf("[Validator DEBUG] Document ID '%s' (length %d) failed regex validation\n", docID, len(docID))
+		return fmt.Errorf("%w: must match format 'doc-[hexstring]' (expected 'doc-' followed by 32 hex chars)", ErrInvalidDocumentID)
 	}
 
 	return nil

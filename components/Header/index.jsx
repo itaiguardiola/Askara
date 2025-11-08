@@ -20,6 +20,10 @@ const Header = (): React.Node => {
             to: thisSite + '/',
             text: 'Home',
         },
+        {
+            to: thisSite + '/config',
+            text: 'Configuration',
+        },
     ];
 
     const [showPancakeMenu, setShowPancakeMenu] = React.useState(false);

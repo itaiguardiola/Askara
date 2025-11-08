@@ -8,6 +8,8 @@ import (
 
 	"github.com/itaiguardiola/askara/form"
 	"github.com/itaiguardiola/askara/llm"
+	"github.com/itaiguardiola/askara/mlworker"
+	"github.com/itaiguardiola/askara/vectordb"
 )
 
 type Context struct {
@@ -52,24 +54,88 @@ func (ctx *HandlerContext) QuestionHandler(w http.ResponseWriter, r *http.Reques
 		providerToUse = customProvider
 	}
 
-	// step 1: Feed question to LLM to get an embedding back
-	questionEmbedding, err := providerToUse.GenerateEmbedding(form.Question)
-	if err != nil {
-		log.Println("[QuestionHandler ERR] LLM get embedding request error\n", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	log.Println("[QuestionHandler] Question Embedding Length:", len(questionEmbedding))
-
-	// step 2: Query vector db using questionEmbedding to get context matches
-	matches, err := ctx.vectorDB.Retrieve(questionEmbedding, 4, form.UUID)
-	if err != nil {
-		log.Println("[QuestionHandler ERR] Vector DB query error\n", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// Optional: Rewrite query for better retrieval
+	queriesToSearch := []string{form.Question}
+	if ctx.queryRewriter.IsEnabled() {
+		rewriteResult, err := ctx.queryRewriter.RewriteQuery(form.Question)
+		if err != nil {
+			log.Printf("[QuestionHandler WARN] Query rewriting failed, using original: %v", err)
+		} else {
+			queriesToSearch = rewriteResult.Variations
+			log.Printf("[QuestionHandler] Using %d query variations for retrieval", len(queriesToSearch))
+		}
 	}
 
-	log.Println("[QuestionHandler] Got matches from vector DB:", matches)
+	// step 1: Generate embeddings for all query variations and retrieve matches using hybrid search
+	allMatches := make([]vectordb.QueryMatch, 0)
+	seenChunks := make(map[string]bool) // For deduplication
+
+	for i, query := range queriesToSearch {
+		queryEmbedding, err := providerToUse.GenerateEmbedding(query)
+		if err != nil {
+			log.Printf("[QuestionHandler WARN] Embedding failed for query %d: %v", i, err)
+			continue
+		}
+
+		// Use hybrid search (vector + FTS) instead of just vector search
+		matches, err := ctx.vectorDB.HybridSearch(queryEmbedding, query, 4, form.UUID)
+		if err != nil {
+			log.Printf("[QuestionHandler WARN] Hybrid search failed for query %d: %v", i, err)
+			continue
+		}
+
+		// Deduplicate matches based on chunk ID
+		for _, match := range matches {
+			chunkID := match.ID
+			if !seenChunks[chunkID] {
+				seenChunks[chunkID] = true
+				allMatches = append(allMatches, match)
+			}
+		}
+	}
+
+	log.Printf("[QuestionHandler] Retrieved %d unique matches using hybrid search", len(allMatches))
+
+	// Optional: Rerank using ML Worker for better relevance
+	mlClient := mlworker.GetClient()
+	if mlClient.IsFeatureEnabled("rerank") && len(allMatches) > 0 {
+		// Prepare documents for reranking
+		rerankDocs := make([]mlworker.RerankDocument, len(allMatches))
+		for i, match := range allMatches {
+			rerankDocs[i] = mlworker.RerankDocument{
+				ID:   match.ID,
+				Text: match.Metadata["text"],
+			}
+		}
+
+		// Rerank to get top 6 results
+		reranked, err := mlClient.Rerank(form.Question, rerankDocs, 6)
+		if err != nil {
+			log.Printf("[QuestionHandler WARN] Reranking failed, using hybrid search order: %v", err)
+		} else {
+			// Reorder matches based on reranking results
+			reorderedMatches := make([]vectordb.QueryMatch, 0, len(reranked.Results))
+			for _, result := range reranked.Results {
+				// Find the match with this ID
+				for _, match := range allMatches {
+					if match.ID == result.ID {
+						// Update score with reranker score
+						match.Score = float32(result.RelevanceScore)
+						reorderedMatches = append(reorderedMatches, match)
+						break
+					}
+				}
+			}
+			allMatches = reorderedMatches
+			log.Printf("[QuestionHandler] Reranked to %d results using ML Worker", len(allMatches))
+		}
+	}
+
+	// Limit to top 6 matches if we have more (after reranking or from hybrid search)
+	matches := allMatches
+	if len(matches) > 6 {
+		matches = matches[:6]
+	}
 
 	// Extract context text and titles from the matches
 	contexts := make([]Context, len(matches))
@@ -153,22 +219,87 @@ func (ctx *HandlerContext) StreamingQuestionHandler(w http.ResponseWriter, r *ht
 		providerToUse = customProvider
 	}
 
-	// step 1: Feed question to LLM to get an embedding back
-	questionEmbedding, err := providerToUse.GenerateEmbedding(form.Question)
-	if err != nil {
-		log.Println("[StreamingQuestionHandler ERR] LLM get embedding request error\n", err.Error())
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
-		flusher.Flush()
-		return
+	// Optional: Rewrite query for better retrieval
+	queriesToSearch := []string{form.Question}
+	if ctx.queryRewriter.IsEnabled() {
+		rewriteResult, err := ctx.queryRewriter.RewriteQuery(form.Question)
+		if err != nil {
+			log.Printf("[StreamingQuestionHandler WARN] Query rewriting failed, using original: %v", err)
+		} else {
+			queriesToSearch = rewriteResult.Variations
+			log.Printf("[StreamingQuestionHandler] Using %d query variations for retrieval", len(queriesToSearch))
+		}
 	}
 
-	// step 2: Query vector db using questionEmbedding to get context matches
-	matches, err := ctx.vectorDB.Retrieve(questionEmbedding, 4, form.UUID)
-	if err != nil {
-		log.Println("[StreamingQuestionHandler ERR] Vector DB query error\n", err.Error())
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
-		flusher.Flush()
-		return
+	// step 1: Generate embeddings for all query variations and retrieve matches using hybrid search
+	allMatches := make([]vectordb.QueryMatch, 0)
+	seenChunks := make(map[string]bool) // For deduplication
+
+	for i, query := range queriesToSearch {
+		queryEmbedding, err := providerToUse.GenerateEmbedding(query)
+		if err != nil {
+			log.Printf("[StreamingQuestionHandler WARN] Embedding failed for query %d: %v", i, err)
+			continue
+		}
+
+		// Use hybrid search (vector + FTS) instead of just vector search
+		matches, err := ctx.vectorDB.HybridSearch(queryEmbedding, query, 4, form.UUID)
+		if err != nil {
+			log.Printf("[StreamingQuestionHandler WARN] Hybrid search failed for query %d: %v", i, err)
+			continue
+		}
+
+		// Deduplicate matches based on chunk ID
+		for _, match := range matches {
+			chunkID := match.ID
+			if !seenChunks[chunkID] {
+				seenChunks[chunkID] = true
+				allMatches = append(allMatches, match)
+			}
+		}
+	}
+
+	log.Printf("[StreamingQuestionHandler] Retrieved %d unique matches using hybrid search", len(allMatches))
+
+	// Optional: Rerank using ML Worker for better relevance
+	mlClient := mlworker.GetClient()
+	if mlClient.IsFeatureEnabled("rerank") && len(allMatches) > 0 {
+		// Prepare documents for reranking
+		rerankDocs := make([]mlworker.RerankDocument, len(allMatches))
+		for i, match := range allMatches {
+			rerankDocs[i] = mlworker.RerankDocument{
+				ID:   match.ID,
+				Text: match.Metadata["text"],
+			}
+		}
+
+		// Rerank to get top 6 results
+		reranked, err := mlClient.Rerank(form.Question, rerankDocs, 6)
+		if err != nil {
+			log.Printf("[StreamingQuestionHandler WARN] Reranking failed, using hybrid search order: %v", err)
+		} else {
+			// Reorder matches based on reranking results
+			reorderedMatches := make([]vectordb.QueryMatch, 0, len(reranked.Results))
+			for _, result := range reranked.Results {
+				// Find the match with this ID
+				for _, match := range allMatches {
+					if match.ID == result.ID {
+						// Update score with reranker score
+						match.Score = float32(result.RelevanceScore)
+						reorderedMatches = append(reorderedMatches, match)
+						break
+					}
+				}
+			}
+			allMatches = reorderedMatches
+			log.Printf("[StreamingQuestionHandler] Reranked to %d results using ML Worker", len(allMatches))
+		}
+	}
+
+	// Limit to top 6 matches if we have more (after reranking or from hybrid search)
+	matches := allMatches
+	if len(matches) > 6 {
+		matches = matches[:6]
 	}
 
 	// Extract context text and titles from the matches

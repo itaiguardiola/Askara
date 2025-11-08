@@ -52,6 +52,9 @@ export interface SystemConfig {
   vector_db: string;
   qdrant_endpoint?: string;
   pinecone_endpoint?: string;
+  ml_worker_enabled: boolean;
+  ml_worker_endpoint?: string;
+  ml_worker_features?: string[];
   port: string;
 }
 
@@ -76,7 +79,7 @@ export interface OllamaModelsResponse {
 }
 
 export interface ConnectionTestRequest {
-  type: 'ollama' | 'qdrant' | 'pinecone';
+  type: 'ollama' | 'qdrant' | 'pinecone' | 'mlworker';
   endpoint?: string;
   api_key?: string;
   model?: string;
@@ -88,12 +91,27 @@ export interface ConnectionTestResponse {
   details?: string;
 }
 
+// Helper to generate UUID v4 (compatible with older browsers)
+function generateUUID(): string {
+  // Try modern crypto.randomUUID if available
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  // Fallback for older browsers (like Safari on iOS)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Helper to get or create UUID
 export function getOrCreateUUID(): string {
   const stored = localStorage.getItem('askara_uuid');
   if (stored) return stored;
 
-  const newUUID = crypto.randomUUID();
+  const newUUID = generateUUID();
   localStorage.setItem('askara_uuid', newUUID);
   return newUUID;
 }

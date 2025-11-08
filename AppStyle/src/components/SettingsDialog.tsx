@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Database, Cpu, HardDrive, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Settings, Database, Cpu, HardDrive, CheckCircle2, XCircle, Loader2, Brain } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -55,7 +55,7 @@ export function SettingsDialog() {
     }
   };
 
-  const testConnection = async (type: 'ollama' | 'qdrant' | 'pinecone', endpoint?: string) => {
+  const testConnection = async (type: 'ollama' | 'qdrant' | 'pinecone' | 'mlworker', endpoint?: string) => {
     setTesting({ ...testing, [type]: true });
     try {
       const result = await api.testConnection({ type, endpoint });
@@ -319,6 +319,87 @@ export function SettingsDialog() {
                           )}
                         </div>
                       </>
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+              {/* ML Worker Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold">ML Worker</h3>
+                </div>
+                <Card className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-muted-foreground">Status</Label>
+                      <Badge variant={config.ml_worker_enabled ? "default" : "secondary"}>
+                        {config.ml_worker_enabled ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                    </div>
+
+                    {config.ml_worker_enabled && config.ml_worker_endpoint && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <Label className="text-muted-foreground">Endpoint</Label>
+                          <span className="text-sm font-mono">{config.ml_worker_endpoint}</span>
+                        </div>
+
+                        {config.ml_worker_features && config.ml_worker_features.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-muted-foreground">Enabled Features</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {config.ml_worker_features.map((feature) => (
+                                <Badge key={feature} variant="outline">
+                                  {feature}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <Separator />
+                        <div className="space-y-2">
+                          <Button
+                            onClick={() => testConnection('mlworker', config.ml_worker_endpoint)}
+                            disabled={testing.mlworker}
+                            className="w-full"
+                            variant="outline"
+                          >
+                            {testing.mlworker ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Testing...
+                              </>
+                            ) : (
+                              'Test ML Worker Connection'
+                            )}
+                          </Button>
+                          {testResults.mlworker && (
+                            <div
+                              className={`flex items-center gap-2 text-sm p-2 rounded ${
+                                testResults.mlworker.success
+                                  ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
+                                  : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+                              }`}
+                            >
+                              {testResults.mlworker.success ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : (
+                                <XCircle className="h-4 w-4" />
+                              )}
+                              <span>{testResults.mlworker.message}</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {!config.ml_worker_enabled && (
+                      <p className="text-sm text-muted-foreground">
+                        ML Worker provides enhanced document processing capabilities including OCR, image enhancement, captioning, and classification.
+                      </p>
                     )}
                   </div>
                 </Card>

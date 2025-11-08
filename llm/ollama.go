@@ -125,7 +125,11 @@ func (o *OllamaProvider) buildPromptWithContext(prompt string, contextTexts []st
 	}
 
 	var sb strings.Builder
-	sb.WriteString("Use the following context to answer the question:\n\n")
+	sb.WriteString("You are a helpful assistant that answers questions based ONLY on the provided context. ")
+	sb.WriteString("Extract specific information directly from the context to answer the question. ")
+	sb.WriteString("Do NOT use placeholders like [Insert...] or generic template responses. ")
+	sb.WriteString("If the information is in the context, quote it directly. ")
+	sb.WriteString("If the information is not in the context, say 'I cannot find this information in the provided documents.'\n\n")
 	sb.WriteString("Context:\n")
 	for i, ctx := range contextTexts {
 		sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, ctx))
@@ -133,7 +137,7 @@ func (o *OllamaProvider) buildPromptWithContext(prompt string, contextTexts []st
 	sb.WriteString("\n")
 	sb.WriteString("Question: ")
 	sb.WriteString(prompt)
-	sb.WriteString("\n\nAnswer:")
+	sb.WriteString("\n\nAnswer (use only information from the context above):")
 
 	return sb.String()
 }
@@ -244,13 +248,20 @@ func (o *OllamaProvider) StreamCompletion(prompt string, contextTexts []string, 
 			continue
 		}
 
+		// Debug: log raw response
+		log.Printf("[OllamaProvider] Raw line: %s", string(line))
+
 		var streamResp ollamaGenerateResponse
 		if err := json.Unmarshal(line, &streamResp); err != nil {
 			log.Printf("[OllamaProvider] Warning: failed to decode streaming response: %v", err)
 			continue
 		}
 
+		log.Printf("[OllamaProvider] Parsed response: model=%s, done=%v, response_len=%d", streamResp.Model, streamResp.Done, len(streamResp.Response))
+
 		if streamResp.Response != "" {
+			// Debug: show what we're streaming
+			log.Printf("[OllamaProvider] Chunk: %q (len=%d)", streamResp.Response, len(streamResp.Response))
 			onChunk(streamResp.Response)
 		}
 

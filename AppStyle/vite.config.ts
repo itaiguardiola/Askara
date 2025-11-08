@@ -54,15 +54,16 @@
       outDir: 'dist',
     },
     server: {
+      host: true, // Listen on all network interfaces (0.0.0.0)
       port: 5173,
       open: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:8100',
+          target: 'http://192.168.0.83:8100',
           changeOrigin: true,
         },
         '/upload': {
-          target: 'http://localhost:8100',
+          target: 'http://192.168.0.83:8100',
           changeOrigin: true,
         },
       },

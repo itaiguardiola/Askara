@@ -48,7 +48,11 @@ func newOllamaProviderFromConfig(config *Config) (LLMProvider, error) {
 	}
 
 	// Override with environment variables if set
-	if baseURL := os.Getenv("OLLAMA_BASE_URL"); baseURL != "" {
+	// Check OLLAMA_HOST first (preferred), then fall back to OLLAMA_BASE_URL
+	if baseURL := os.Getenv("OLLAMA_HOST"); baseURL != "" {
+		ollamaConfig.BaseURL = baseURL
+		log.Printf("[Factory] Using OLLAMA_HOST from environment: %s", baseURL)
+	} else if baseURL := os.Getenv("OLLAMA_BASE_URL"); baseURL != "" {
 		ollamaConfig.BaseURL = baseURL
 		log.Printf("[Factory] Using OLLAMA_BASE_URL from environment: %s", baseURL)
 	}
@@ -58,7 +62,11 @@ func newOllamaProviderFromConfig(config *Config) (LLMProvider, error) {
 		log.Printf("[Factory] Using OLLAMA_MODEL from environment: %s", model)
 	}
 
-	if embedModel := os.Getenv("OLLAMA_EMBED_MODEL"); embedModel != "" {
+	// Check OLLAMA_EMBEDDING_MODEL first, then OLLAMA_EMBED_MODEL
+	if embedModel := os.Getenv("OLLAMA_EMBEDDING_MODEL"); embedModel != "" {
+		ollamaConfig.EmbedModel = embedModel
+		log.Printf("[Factory] Using OLLAMA_EMBEDDING_MODEL from environment: %s", embedModel)
+	} else if embedModel := os.Getenv("OLLAMA_EMBED_MODEL"); embedModel != "" {
 		ollamaConfig.EmbedModel = embedModel
 		log.Printf("[Factory] Using OLLAMA_EMBED_MODEL from environment: %s", embedModel)
 	}
@@ -130,13 +138,25 @@ func NewProviderFromEnv() (LLMProvider, error) {
 
 	switch strings.ToLower(providerType) {
 	case "ollama":
+		// Check OLLAMA_HOST first, then OLLAMA_BASE_URL, then use default
+		baseURL := os.Getenv("OLLAMA_HOST")
+		log.Printf("[Factory][DEBUG] OLLAMA_HOST='%s', OLLAMA_BASE_URL='%s'", baseURL, os.Getenv("OLLAMA_BASE_URL"))
+		if baseURL == "" {
+			baseURL = getEnvOrDefault("OLLAMA_BASE_URL", "http://localhost:11434")
+		}
+		// Check OLLAMA_EMBEDDING_MODEL first, then OLLAMA_EMBED_MODEL
+		embedModel := os.Getenv("OLLAMA_EMBEDDING_MODEL")
+		if embedModel == "" {
+			embedModel = getEnvOrDefault("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+		}
 		config.OllamaConfig = &OllamaConfig{
-			BaseURL:     getEnvOrDefault("OLLAMA_BASE_URL", "http://localhost:11434"),
+			BaseURL:     baseURL,
 			Model:       getEnvOrDefault("OLLAMA_MODEL", "llama2"),
-			EmbedModel:  getEnvOrDefault("OLLAMA_EMBED_MODEL", "nomic-embed-text"),
+			EmbedModel:  embedModel,
 			Temperature: 0.7,
 			MaxTokens:   2000,
 		}
+		log.Printf("[Factory][DEBUG] Created OllamaConfig with BaseURL='%s'", baseURL)
 	case "openai":
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {

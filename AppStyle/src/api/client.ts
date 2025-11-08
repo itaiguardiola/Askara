@@ -141,13 +141,18 @@ export class AskaraAPI {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        for (const line of lines) {
+        // Parse SSE events - iterate with index to look ahead
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+
           if (line.startsWith('event:')) {
             const eventType = line.slice(6).trim();
-            const nextLine = lines.shift();
+            // Look ahead to next line for data
+            const nextLine = lines[i + 1];
 
             if (nextLine?.startsWith('data:')) {
-              const data = nextLine.slice(5).trim();
+              const data = nextLine.slice(6); // Skip "data: " (5 chars + 1 space)
+              i++; // Skip the data line we just processed
 
               if (eventType === 'chunk') {
                 onChunk(data);
@@ -161,7 +166,7 @@ export class AskaraAPI {
               } else if (eventType === 'error' && onError) {
                 onError(data);
               } else if (eventType === 'done') {
-                break;
+                return; // Exit completely when done
               }
             }
           }

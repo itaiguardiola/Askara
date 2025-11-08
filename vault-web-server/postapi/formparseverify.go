@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/schema"
 	"github.com/itaiguardiola/askara/errorlist"
@@ -13,18 +14,27 @@ import (
 
 // Util: does grunt work of decoding + verifying form + writing errors back
 func FormParseVerify(form form.Form, name string, w http.ResponseWriter, r *http.Request) errorlist.Errors {
-	if err := r.ParseMultipartForm(80000); err != nil {
-		log.Printf("[%s] Error parsing form POST\n", name)
-		errs := errorlist.NewSingleError("parsePost", err)
+	// Parse form data based on Content-Type
+	contentType := r.Header.Get("Content-Type")
 
-		bytes, err := json.Marshal(errs)
-		if err != nil {
-			log.Println("Dev fucked up bad, errors didn't JSON encode")
-			return nil
+	// Handle URL-encoded forms (application/x-www-form-urlencoded)
+	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
+		if err := r.ParseForm(); err != nil {
+			log.Printf("[%s] Error parsing URL-encoded form: %v\n", name, err)
+			errs := errorlist.NewSingleError("parsePost", err)
+			bytes, _ := json.Marshal(errs)
+			http.Error(w, fmt.Sprintf("%s", bytes), http.StatusBadRequest)
+			return errs
 		}
-
-		http.Error(w, fmt.Sprintf("%s", bytes), http.StatusBadRequest)
-		return errs
+	} else {
+		// Handle multipart forms (multipart/form-data)
+		if err := r.ParseMultipartForm(80000); err != nil {
+			log.Printf("[%s] Error parsing multipart form: %v\n", name, err)
+			errs := errorlist.NewSingleError("parsePost", err)
+			bytes, _ := json.Marshal(errs)
+			http.Error(w, fmt.Sprintf("%s", bytes), http.StatusBadRequest)
+			return errs
+		}
 	}
 
 	if err := schema.NewDecoder().Decode(form, r.Form); err != nil {

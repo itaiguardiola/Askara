@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -81,6 +83,10 @@ func (q *Qdrant) NamespaceExists(uuid string) (bool, error) {
 }
 
 func (q *Qdrant) CreateNamespace(uuid string) error {
+	return q.CreateNamespaceWithSize(uuid, VECTOR_SIZE)
+}
+
+func (q *Qdrant) CreateNamespaceWithSize(uuid string, vectorSize int) error {
 	if _, found := q.cache.Get(uuid); found {
 		return nil
 	}
@@ -92,8 +98,9 @@ func (q *Qdrant) CreateNamespace(uuid string) error {
 	}
 
 	config := NamespaceConfig{}
-	config.Vectors.Size = VECTOR_SIZE
+	config.Vectors.Size = vectorSize
 	config.Vectors.Distance = VECTOR_DISTANCE
+	log.Printf("[Qdrant] Creating collection '%s' with vector size %d", uuid, vectorSize)
 
 	jsonData, err := json.Marshal(config)
 	if err != nil {
@@ -117,8 +124,52 @@ func (q *Qdrant) CreateNamespace(uuid string) error {
 		return fmt.Errorf("failed to create namespace, status code: %d", resp.StatusCode)
 	}
 
+	// Create FTS index on text field for keyword search
+	if err := q.CreateTextIndex(uuid); err != nil {
+		log.Printf("[Qdrant] Warning: Failed to create text index: %v", err)
+		// Don't fail collection creation if index creation fails
+	}
+
 	q.cache.Set(uuid, true, cache.DefaultExpiration)
 
+	return nil
+}
+
+// CreateTextIndex creates a full-text search index on the text payload field
+func (q *Qdrant) CreateTextIndex(uuid string) error {
+	indexConfig := map[string]interface{}{
+		"field_name": "text",
+		"field_schema": map[string]string{
+			"type": "text",
+		},
+	}
+
+	jsonData, err := json.Marshal(indexConfig)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPut,
+		fmt.Sprintf("%s/collections/%s/index", q.Endpoint, uuid),
+		bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create text index, status: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	log.Printf("[Qdrant] Created FTS index on 'text' field for collection '%s'", uuid)
 	return nil
 }
 
@@ -129,7 +180,14 @@ func (q *Qdrant) UpsertEmbeddings(embeddings [][]float32, chunks []chunk.Chunk, 
 }
 
 func (q *Qdrant) UpsertEmbeddingsWithDocID(embeddings [][]float32, chunks []chunk.Chunk, uuid string, docID string) error {
-	if err := q.CreateNamespace(uuid); err != nil {
+	// Detect vector size from first embedding
+	vectorSize := VECTOR_SIZE
+	if len(embeddings) > 0 && len(embeddings[0]) > 0 {
+		vectorSize = len(embeddings[0])
+		log.Printf("[Qdrant] Detected vector size: %d from embeddings", vectorSize)
+	}
+
+	if err := q.CreateNamespaceWithSize(uuid, vectorSize); err != nil {
 		return err
 	}
 
@@ -147,6 +205,8 @@ func (q *Qdrant) UpsertEmbeddingsWithDocID(embeddings [][]float32, chunks []chun
 				"title":     chunks[i].Title,
 				"text":      chunks[i].Text,
 				"file_name": chunks[i].Title,
+				"page":      fmt.Sprintf("%d", chunks[i].Page),
+				"heading":   chunks[i].Heading,
 			}
 		}
 	}
@@ -209,7 +269,9 @@ func (q *Qdrant) Retrieve(questionEmbedding []float32, topK int, uuid string) ([
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to retrieve embeddings, status code: %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("[Qdrant] Search failed with status %d. Response: %s", resp.StatusCode, string(bodyBytes))
+		return nil, fmt.Errorf("failed to retrieve embeddings, status code: %d, response: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var searchResult SearchResult
@@ -227,6 +289,124 @@ func (q *Qdrant) Retrieve(questionEmbedding []float32, topK int, uuid string) ([
 	}
 
 	return queryMatches, nil
+}
+
+// SearchText performs full-text search on the text field
+func (q *Qdrant) SearchText(query string, topK int, uuid string) ([]vectordb.QueryMatch, error) {
+	data := map[string]interface{}{
+		"limit": topK,
+		"filter": map[string]interface{}{
+			"must": []map[string]interface{}{
+				{
+					"key": "text",
+					"match": map[string]interface{}{
+						"text": query,
+					},
+				},
+			},
+		},
+		"with_payload": true,
+		"with_vector":  false,
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/collections/%s/points/scroll", q.Endpoint, uuid), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("[Qdrant] Text search failed with status %d. Response: %s", resp.StatusCode, string(bodyBytes))
+		return nil, fmt.Errorf("failed to search text, status code: %d, response: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result struct {
+		Result struct {
+			Points []struct {
+				ID      int               `json:"id"`
+				Payload map[string]string `json:"payload"`
+			} `json:"points"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	// Convert to QueryMatch with default score (FTS doesn't provide scores)
+	queryMatches := make([]vectordb.QueryMatch, len(result.Result.Points))
+	for i, point := range result.Result.Points {
+		queryMatches[i].ID = fmt.Sprintf("%d", point.ID)
+		queryMatches[i].Score = 1.0 // FTS doesn't provide relevance scores
+		queryMatches[i].Metadata = point.Payload
+	}
+
+	return queryMatches, nil
+}
+
+// HybridSearch combines vector search and full-text search results
+func (q *Qdrant) HybridSearch(vectorQuery []float32, textQuery string, topK int, uuid string) ([]vectordb.QueryMatch, error) {
+	// Retrieve more results from each method to ensure good coverage
+	retrievalSize := topK * 2
+
+	// Perform vector search
+	vectorMatches, err := q.Retrieve(vectorQuery, retrievalSize, uuid)
+	if err != nil {
+		log.Printf("[Qdrant] Vector search failed in hybrid search: %v", err)
+		vectorMatches = []vectordb.QueryMatch{}
+	}
+
+	// Perform text search
+	textMatches, err := q.SearchText(textQuery, retrievalSize, uuid)
+	if err != nil {
+		log.Printf("[Qdrant] Text search failed in hybrid search: %v", err)
+		textMatches = []vectordb.QueryMatch{}
+	}
+
+	// Merge and deduplicate results
+	seen := make(map[string]bool)
+	merged := make([]vectordb.QueryMatch, 0, len(vectorMatches)+len(textMatches))
+
+	// Add vector matches first (they have semantic relevance scores)
+	for _, match := range vectorMatches {
+		if !seen[match.ID] {
+			seen[match.ID] = true
+			merged = append(merged, match)
+		}
+	}
+
+	// Add text matches that weren't already found
+	for _, match := range textMatches {
+		if !seen[match.ID] {
+			seen[match.ID] = true
+			// Boost score slightly for FTS matches to give them some weight
+			match.Score = 0.5
+			merged = append(merged, match)
+		}
+	}
+
+	// Limit to topK results
+	if len(merged) > topK {
+		merged = merged[:topK]
+	}
+
+	log.Printf("[Qdrant] Hybrid search: %d vector + %d text = %d merged (top %d)",
+		len(vectorMatches), len(textMatches), len(merged), topK)
+
+	return merged, nil
 }
 
 // DeleteByDocumentID deletes all points associated with a document ID

@@ -190,7 +190,23 @@ const LandingPage = (props: Props): React.Node => {
             contentPreferredWidth={1300}
             contentClass={s.pageContent}>
             <div className={s.text}>
-                <h1>Askara - AI-Powered Knowledge Base</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h1>Askara - AI-Powered Knowledge Base</h1>
+                    <button
+                        onClick={() => props.history.push('/config')}
+                        style={{
+                            background: '#1E3A50',
+                            color: 'white',
+                            border: 'none',
+                            padding: '12px 24px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '600'
+                        }}>
+                        ⚙️ Configuration
+                    </button>
+                </div>
                 {errorMessage && <div className={s.error}>{errorMessage}</div>}
                 <div className={s.workArea}>
                     <div className={s.leftColumn}>

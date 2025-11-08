@@ -20,6 +20,7 @@ type Document struct {
 	UUID         string    `json:"uuid"`
 	Filename     string    `json:"filename"`
 	FileSize     int64     `json:"file_size"`
+	ContentHash  string    `json:"content_hash"` // SHA256 hash of file content for deduplication
 	UploadDate   time.Time `json:"upload_date"`
 	ChunkCount   int       `json:"chunk_count"`
 	ContentType  string    `json:"content_type"`
@@ -79,7 +80,8 @@ func GenerateDocumentID(filename string) string {
 		timestamp := time.Now().UnixNano()
 		data := fmt.Sprintf("%s-%d", filename, timestamp)
 		hash := sha256.Sum256([]byte(data))
-		return fmt.Sprintf("doc-%s", hex.EncodeToString(hash[:8]))
+		// Use 16 bytes (32 hex chars) to match the validator regex
+		return fmt.Sprintf("doc-%s", hex.EncodeToString(hash[:16]))
 	}
 	return docID
 }
@@ -275,4 +277,30 @@ func (s *JSONDocumentStore) GetStats(uuid string) (*DocumentStats, error) {
 	}
 
 	return stats, nil
+}
+
+// FindDocumentByContentHash finds a document with the same content hash for a given UUID
+// Returns nil if no duplicate is found
+func (s *JSONDocumentStore) FindDocumentByContentHash(uuid, contentHash string) (*Document, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	docs, err := s.loadUserDocuments(uuid)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, doc := range docs.Documents {
+		if doc.ContentHash == contentHash {
+			return &doc, nil
+		}
+	}
+
+	return nil, nil // No duplicate found
+}
+
+// ComputeContentHash computes SHA256 hash of content
+func ComputeContentHash(content string) string {
+	hash := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(hash[:])
 }

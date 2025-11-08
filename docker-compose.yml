@@ -34,6 +34,15 @@ services:
       - PORT=${PORT:-8100}
       - DEBUG_SITE=${DEBUG_SITE:-false}
 
+      # ML Worker Configuration (optional)
+      - ML_WORKER_ENABLED=${ML_WORKER_ENABLED:-false}
+      - ML_WORKER_ENDPOINT=${ML_WORKER_ENDPOINT:-http://192.168.0.250:6161/askara}
+      - ML_WORKER_FEATURES=${ML_WORKER_FEATURES:-ocr,enhance,caption}
+      - ML_WORKER_TIMEOUT=${ML_WORKER_TIMEOUT:-30}
+
+      # Query Rewriting (optional, uses local Ollama)
+      - QUERY_REWRITE_ENABLED=${QUERY_REWRITE_ENABLED:-false}
+
     volumes:
       # Persist document data
       - ./data:/app/data
@@ -70,7 +79,7 @@ services:
     networks:
       - askara-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/"]
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -166,6 +166,49 @@ body {
                     margin-top: 24px;
                     margin-bottom: 16px;
                     font-size: 24px;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    max-width: 100%;
+                    line-height: 1.6;
+
+                    p {
+                        margin: 1em 0;
+                        line-height: 1.6;
+                        white-space: normal;
+                    }
+
+                    ul, ol {
+                        margin: 1em 0;
+                        padding-left: 2em;
+                        white-space: normal;
+                    }
+
+                    li {
+                        margin: 0.5em 0;
+                    }
+
+                    h1, h2, h3, h4, h5, h6 {
+                        margin: 1.2em 0 0.6em 0;
+                        line-height: 1.4;
+                        white-space: normal;
+                    }
+
+                    code {
+                        white-space: pre-wrap;
+                        word-break: break-word;
+                    }
+
+                    pre {
+                        white-space: pre-wrap;
+                        overflow-wrap: break-word;
+                        overflow-x: auto;
+                    }
+
+                    strong, b, em, i {
+                        white-space: inherit;
+                    }
                 }
 
                 .contexts {
@@ -208,22 +251,20 @@ body {
                             }
                         }
 
-                        .content {
-                            overflow: hidden;
-                            max-height: 0;
-                            transition: max-height 0.3s ease-in-out;
-
-                            &.expanded {
-                                max-height: 500px;
-                            }
+                        .collapsed, .expanded {
+                            word-wrap: break-word;
+                            overflow-wrap: break-word;
+                            white-space: pre-wrap;
+                            padding: 12px;
                         }
 
-                        .preview {
-                            display: inline;
-                            white-space: nowrap;
+                        .collapsed {
+                            max-height: 100px;
                             overflow: hidden;
-                            text-overflow: ellipsis;
-                            max-width: 90%;
+                        }
+
+                        .expanded {
+                            max-height: none;
                         }
                     }
                 }
