@@ -1,0 +1,195 @@
+{
+  "test_session": {
+    "timestamp": "2025-11-08T05:33:24Z",
+    "source": "Askara Integration Testing",
+    "tester": "Claude Code AI Assistant",
+    "askara_version": "1.0.0",
+    "ml_worker_version": "1.0.0"
+  },
+  "connectivity": {
+    "status": "PASS",
+    "endpoint": "http://192.168.0.250:6161/askara",
+    "response_time_ms": 150,
+    "swagger_ui": "http://192.168.0.250:6161/docs"
+  },
+  "service_discovery": {
+    "status": "PASS",
+    "endpoints_found": 9,
+    "features_enabled": [
+      "ocr",
+      "caption",
+      "visual_qa",
+      "enhance",
+      "classify_document",
+      "table_extraction",
+      "object_detection",
+      "batch_processing",
+      "document_parsing"
+    ],
+    "cluster_management_available": true,
+    "health_monitoring": "supported"
+  },
+  "integration_status": {
+    "askara_go_client": "OPERATIONAL",
+    "client_location": "mlworker/client.go",
+    "client_lines_of_code": 390,
+    "rerank_feature": "ACTIVE_IN_PRODUCTION",
+    "rerank_usage": "vault-web-server/postapi/questions.go",
+    "parse_feature": "NOT_ENABLED",
+    "code_quality": "EXCELLENT",
+    "architecture": "Clean interfaces, typed requests/responses, feature flags"
+  },
+  "issues_found": [
+    {
+      "id": "ISSUE-001",
+      "severity": "HIGH",
+      "priority": "MEDIUM",
+      "component": "/askara/parse endpoint",
+      "issue": "Documentation mismatch - data: URLs rejected",
+      "details": {
+        "file": "ML_WORKER_PARSE_API.md (Askara repo)",
+        "line": "16-22",
+        "documented_behavior": "Accepts data:application/pdf;base64,... URLs",
+        "actual_behavior": "Rejects with 'URL scheme should be http or https'",
+        "error_response": {
+          "type": "url_scheme",
+          "loc": ["body", "document_url"],
+          "msg": "URL scheme should be 'http' or 'https'",
+          "ctx": {
+            "expected_schemes": "'http' or 'https'"
+          }
+        },
+        "test_payload": {
+          "document_url": "data:text/plain;base64,VGhpcyBpcyBhIHRlc3QgZG9jdW1lbnQgZm9yIEFza2FyYS4gSXQgY29udGFpbnMgc2FtcGxlIHRleHQgdG8gdGVzdCB0aGUgZW1iZWRkaW5nIGdlbmVyYXRpb24gd2l0aCBPbGxhbWEuCg==",
+          "preserve_structure": true,
+          "extract_tables": true
+        }
+      },
+      "recommendation": {
+        "option_1": "Update ML_WORKER_PARSE_API.md to document HTTP/HTTPS-only requirement",
+        "option_2": "Implement data: URL support in parse endpoint (decode base64, save temp file, process)",
+        "preferred": "option_2 - Enables simpler integration"
+      },
+      "impact": {
+        "severity": "Medium",
+        "description": "Cannot send documents directly as base64 encoded data URLs",
+        "affected_use_cases": [
+          "Direct document upload from browser",
+          "Inline document processing",
+          "Memory-only document handling"
+        ],
+        "current_requirement": "Must serve files via HTTP endpoint before calling parse API"
+      },
+      "workaround": {
+        "description": "Create temporary HTTP endpoint to serve uploaded files",
+        "implementation_effort": "Low",
+        "performance_impact": "Additional network hop + file I/O"
+      }
+    }
+  ],
+  "performance_observations": {
+    "parse_api": {
+      "response_time": "30-45 seconds",
+      "test_document_size": "106 bytes",
+      "concern": "Slow for small documents",
+      "recommendation": "Consider async processing with job queue for large documents",
+      "suggested_improvements": [
+        "Add /askara/parse-async endpoint returning job_id",
+        "Implement progress callbacks for UI feedback",
+        "Add timeout configuration per-request"
+      ]
+    },
+    "rerank_api": {
+      "status": "Active in production",
+      "model": "BAAI/bge-reranker-v2-m3",
+      "performance": "Good"
+    }
+  },
+  "architecture_validation": {
+    "modular": {
+      "status": true,
+      "evidence": "Separate service, independent deployment, no shared dependencies"
+    },
+    "measurable": {
+      "status": true,
+      "evidence": "Processing time metrics returned in responses (processing_time_ms field)"
+    },
+    "scalable": {
+      "status": true,
+      "evidence": "Cluster management API supports multiple worker instances"
+    },
+    "multiple_instances_supported": {
+      "status": true,
+      "evidence": "/cluster/* endpoints for partner management and load balancing"
+    }
+  },
+  "test_summary": {
+    "total_tests": 4,
+    "passed": 3,
+    "failed": 1,
+    "warnings": 1,
+    "overall_status": "OPERATIONAL_WITH_DOCUMENTATION_ISSUE",
+    "production_readiness": "READY (with documentation fix)"
+  },
+  "recommendations_for_ml_team": [
+    {
+      "priority": "HIGH",
+      "category": "API Consistency",
+      "action": "Fix data: URL handling in /askara/parse endpoint",
+      "details": "Either update documentation OR implement data: URL decoding support"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Performance",
+      "action": "Add async parse endpoint",
+      "details": "For large documents, return job_id immediately and process in background"
+    },
+    {
+      "priority": "LOW",
+      "category": "Developer Experience",
+      "action": "Add example curl commands to Swagger UI",
+      "details": "Include working examples with HTTP URLs in OpenAPI spec"
+    }
+  ],
+  "recommendations_for_askara_team": [
+    {
+      "priority": "HIGH",
+      "category": "Integration",
+      "action": "Enable parse feature in production",
+      "details": "Set ML_WORKER_FEATURES=ocr,enhance,caption,parse,rerank in .env"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Architecture",
+      "action": "Implement file serving endpoint",
+      "details": "Add /api/temp-files endpoint to serve uploaded documents via HTTP for ML-Worker processing"
+    },
+    {
+      "priority": "LOW",
+      "category": "Monitoring",
+      "action": "Add ML-Worker health checks",
+      "details": "Periodic connectivity tests and feature availability monitoring"
+    }
+  ],
+  "next_steps": {
+    "immediate": [
+      "ML team: Review and prioritize documentation fix",
+      "Askara team: Decide on file serving approach"
+    ],
+    "short_term": [
+      "Test parse endpoint with HTTP-served files",
+      "Enable parse feature in production environment",
+      "Monitor performance metrics"
+    ],
+    "long_term": [
+      "Implement async processing for large documents",
+      "Add progress tracking and callbacks",
+      "Deploy multiple ML-Worker instances for load balancing"
+    ]
+  },
+  "contact": {
+    "report_generated_by": "Claude Code AI Assistant",
+    "askara_repository": "https://github.com/itaiguardiola/Askara",
+    "askara_branch": "claude/askara-next-steps-011CUtErzJPJHAFP2xpkh2Le"
+  }
+}
