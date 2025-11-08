@@ -131,6 +131,14 @@ func (ctx *HandlerContext) DeleteDocumentHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Delete from code source trust (if enabled)
+	if ctx.codeTrustSvc != nil {
+		if err := ctx.codeTrustSvc.DeleteDocument(uuid, docID); err != nil {
+			log.Printf("[CodeSourceTrust] Failed to delete enrichment for document %s: %v", docID, err)
+			// Don't fail the request - document is already deleted from primary stores
+		}
+	}
+
 	response := DocumentDeleteResponse{
 		Message: "Document deleted successfully",
 		DocID:   docID,

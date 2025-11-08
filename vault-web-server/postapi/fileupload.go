@@ -219,6 +219,16 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 			// Continue anyway - the vectors are uploaded
 		}
 
+		// Extract code symbols and build source of truth (if enabled)
+		if ctx.codeTrustSvc != nil {
+			go func(docID, fileName, uuid, content string) {
+				_, err := ctx.codeTrustSvc.ProcessDocument(docID, fileName, uuid, content)
+				if err != nil {
+					log.Printf("[CodeSourceTrust] Failed to process document %s: %v", fileName, err)
+				}
+			}(docID, fileName, uuid, fileContent)
+		}
+
 		responseData.NumFilesSucceeded++
 		responseData.SuccessfulFileNames = append(responseData.SuccessfulFileNames, fileName)
 		responseData.UploadedDocuments = append(responseData.UploadedDocuments, doc)

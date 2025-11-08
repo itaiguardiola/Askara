@@ -12,35 +12,35 @@ import (
 
 // ConfigResponse represents the current configuration
 type ConfigResponse struct {
-	LLMProvider       string   `json:"llm_provider"`
-	OpenAIModel       string   `json:"openai_model,omitempty"`
-	OpenAIEmbedding   string   `json:"openai_embedding,omitempty"`
-	OllamaHost        string   `json:"ollama_host,omitempty"`
-	OllamaModel       string   `json:"ollama_model,omitempty"`
-	OllamaEmbedding   string   `json:"ollama_embedding,omitempty"`
-	VectorDB          string   `json:"vector_db"`
-	QdrantEndpoint    string   `json:"qdrant_endpoint,omitempty"`
-	PineconeEndpoint  string   `json:"pinecone_endpoint,omitempty"`
-	MLWorkerEnabled   bool     `json:"ml_worker_enabled"`
-	MLWorkerEndpoint  string   `json:"ml_worker_endpoint,omitempty"`
-	MLWorkerFeatures  []string `json:"ml_worker_features,omitempty"`
-	Port              string   `json:"port"`
+	LLMProvider      string   `json:"llm_provider"`
+	OpenAIModel      string   `json:"openai_model,omitempty"`
+	OpenAIEmbedding  string   `json:"openai_embedding,omitempty"`
+	OllamaHost       string   `json:"ollama_host,omitempty"`
+	OllamaModel      string   `json:"ollama_model,omitempty"`
+	OllamaEmbedding  string   `json:"ollama_embedding,omitempty"`
+	VectorDB         string   `json:"vector_db"`
+	QdrantEndpoint   string   `json:"qdrant_endpoint,omitempty"`
+	PineconeEndpoint string   `json:"pinecone_endpoint,omitempty"`
+	MLWorkerEnabled  bool     `json:"ml_worker_enabled"`
+	MLWorkerEndpoint string   `json:"ml_worker_endpoint,omitempty"`
+	MLWorkerFeatures []string `json:"ml_worker_features,omitempty"`
+	Port             string   `json:"port"`
 }
 
 // OllamaModel represents a model available in Ollama
 type OllamaModel struct {
-	Name         string      `json:"name"`
-	Model        string      `json:"model"`
-	ModifiedAt   string      `json:"modified_at"`
-	Size         int64       `json:"size"`
-	Digest       string      `json:"digest"`
-	Details      ModelDetails `json:"details"`
+	Name       string       `json:"name"`
+	Model      string       `json:"model"`
+	ModifiedAt string       `json:"modified_at"`
+	Size       int64        `json:"size"`
+	Digest     string       `json:"digest"`
+	Details    ModelDetails `json:"details"`
 }
 
 type ModelDetails struct {
-	Format           string `json:"format"`
-	Family           string `json:"family"`
-	ParameterSize    string `json:"parameter_size"`
+	Format            string `json:"format"`
+	Family            string `json:"family"`
+	ParameterSize     string `json:"parameter_size"`
 	QuantizationLevel string `json:"quantization_level"`
 }
 
