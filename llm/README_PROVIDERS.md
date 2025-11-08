@@ -22,6 +22,9 @@ Askara now features an advanced **multi-provider LLM system** with intelligent a
 | **Claude** | Cloud | $$ | Fast | ✅ Yes (Voyage) | Reasoning, long context |
 | **Gemini** | Cloud | $ | Very Fast | ✅ Yes | Speed + affordability |
 | **Groq** | Cloud | $ | ULTRA Fast | ❌ No | Ultra-low latency completions |
+| **Azure OpenAI** | Cloud | $$$ | Medium | ✅ Yes | Enterprise compliance, private deployment |
+| **AWS Bedrock** | Cloud | $$ | Medium | ✅ Yes | AWS infrastructure, multi-model access |
+| **Cohere** | Cloud | $$ | Fast | ✅ Yes | RAG-optimized, native document support |
 
 ---
 
@@ -204,6 +207,118 @@ OLLAMA_HOST=http://localhost:11434  # For embeddings
 - Smaller model selection
 
 **Get API Key:** https://console.groq.com/
+
+---
+
+### Azure OpenAI (Cloud, Paid - Enterprise)
+
+**Best for:** Enterprise deployments, compliance requirements, private cloud
+
+```bash
+# .env
+LLM_PROVIDER=azure
+AZURE_OPENAI_API_KEY=your_azure_key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=your-gpt-4-deployment
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=your-embedding-deployment
+AZURE_OPENAI_API_VERSION=2023-05-15
+```
+
+**Pricing:** Same models as OpenAI with enterprise pricing
+- GPT-4: $0.03/1K input, $0.06/1K output
+- GPT-3.5: $0.0015/1K input, $0.002/1K output
+
+**Features:**
+- **Enterprise compliance** (HIPAA, SOC 2, ISO 27001)
+- **Private deployment** within Azure infrastructure
+- **SLA guarantees** and Microsoft support
+- **Azure AD integration** for authentication
+- Same models as OpenAI with added security
+
+**Setup:**
+1. Create Azure OpenAI resource in Azure Portal
+2. Deploy models (create deployments for GPT-4 and embeddings)
+3. Get endpoint and API key from Azure Portal
+4. Use deployment names (not model names) in configuration
+
+**Get Started:** https://portal.azure.com/
+
+---
+
+### AWS Bedrock (Cloud, Paid)
+
+**Best for:** AWS infrastructure users, multi-model access
+
+```bash
+# .env
+LLM_PROVIDER=bedrock
+AWS_REGION=us-east-1
+BEDROCK_MODEL=anthropic.claude-3-5-sonnet-20241022-v2:0
+BEDROCK_EMBEDDING_MODEL=amazon.titan-embed-text-v2:0
+
+# AWS credentials (or use IAM role)
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+```
+
+**Pricing:** Pay-per-use, varies by model
+- Claude 3.5 Sonnet: $0.003/1K input, $0.015/1K output
+- Titan Embeddings: $0.0001/1K tokens
+- Other models: Cohere, Meta Llama, AI21 Labs
+
+**Features:**
+- **Multi-model access** (Claude, Titan, Cohere, Llama)
+- **AWS integration** with VPC, CloudWatch, IAM
+- **Serverless** - no infrastructure management
+- **On-demand and provisioned** throughput options
+
+**Available Models:**
+- `anthropic.claude-3-5-sonnet-20241022-v2:0`
+- `amazon.titan-embed-text-v2:0`
+- `amazon.titan-text-express-v1`
+- `cohere.command-r-plus-v1:0`
+- `meta.llama2-70b-chat-v1`
+
+**Note:** Current implementation requires AWS SDK integration. See `llm/bedrock.go` for full setup.
+
+**Get Started:** https://aws.amazon.com/bedrock/
+
+---
+
+### Cohere (Cloud, Paid)
+
+**Best for:** RAG applications, semantic search, multilingual use cases
+
+```bash
+# .env
+LLM_PROVIDER=cohere
+COHERE_API_KEY=your_cohere_key
+COHERE_MODEL=command-r-plus
+COHERE_EMBEDDING_MODEL=embed-english-v3.0
+```
+
+**Pricing:**
+- Command R+: $0.003/1K input, $0.015/1K output
+- Command R: $0.0005/1K input, $0.0015/1K output
+- Embeddings: $0.0001/1K tokens
+
+**Features:**
+- **Native RAG support** - Pass documents directly to Chat API
+- **Excellent embeddings** - Optimized for retrieval
+- **Multilingual** - Supports 100+ languages
+- **Rerank API** - Improves search relevance (could replace ML Worker)
+
+**Why Cohere for RAG:**
+- Chat API accepts `documents` parameter (perfect for Askara's use case)
+- Command-R models specifically optimized for RAG
+- High-quality embeddings with 1024 dimensions
+- Native citation support in responses
+
+**Embedding Models:**
+- `embed-english-v3.0` - English-optimized (1024-dim)
+- `embed-multilingual-v3.0` - 100+ languages (1024-dim)
+
+**Get API Key:** https://dashboard.cohere.com/api-keys
 
 ---
 

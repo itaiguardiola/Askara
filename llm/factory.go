@@ -27,6 +27,15 @@ const (
 
 	// ProviderTypeGroq represents the Groq provider.
 	ProviderTypeGroq ProviderType = "groq"
+
+	// ProviderTypeAzure represents the Azure OpenAI provider.
+	ProviderTypeAzure ProviderType = "azure"
+
+	// ProviderTypeBedrock represents the AWS Bedrock provider.
+	ProviderTypeBedrock ProviderType = "bedrock"
+
+	// ProviderTypeCohere represents the Cohere provider.
+	ProviderTypeCohere ProviderType = "cohere"
 )
 
 // NewProvider creates a new LLM provider based on the given configuration.
@@ -49,8 +58,14 @@ func NewProvider(config *Config) (LLMProvider, error) {
 		return newGeminiProviderFromConfig(config)
 	case ProviderTypeGroq:
 		return newGroqProviderFromConfig(config)
+	case ProviderTypeAzure:
+		return newAzureProviderFromConfig(config)
+	case ProviderTypeBedrock:
+		return newBedrockProviderFromConfig(config)
+	case ProviderTypeCohere:
+		return newCohereProviderFromConfig(config)
 	default:
-		return nil, fmt.Errorf("unsupported provider type: %s (supported: ollama, openai, claude, gemini, groq)", config.Provider)
+		return nil, fmt.Errorf("unsupported provider type: %s (supported: ollama, openai, claude, gemini, groq, azure, bedrock, cohere)", config.Provider)
 	}
 }
 
@@ -246,11 +261,146 @@ func newGroqProviderFromConfig(config *Config) (LLMProvider, error) {
 	return provider, nil
 }
 
+// newAzureProviderFromConfig creates an Azure OpenAI provider from the config.
+func newAzureProviderFromConfig(config *Config) (LLMProvider, error) {
+	azureConfig := config.AzureConfig
+	if azureConfig == nil {
+		// Try to get configuration from environment
+		apiKey := os.Getenv("AZURE_OPENAI_API_KEY")
+		endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
+		deploymentID := os.Getenv("AZURE_OPENAI_DEPLOYMENT")
+
+		if apiKey == "" || endpoint == "" || deploymentID == "" {
+			return nil, fmt.Errorf("Azure OpenAI requires AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, and AZURE_OPENAI_DEPLOYMENT environment variables")
+		}
+
+		azureConfig = DefaultAzureConfig(apiKey, endpoint, deploymentID)
+		log.Println("[Factory] Using default Azure configuration with environment variables")
+	}
+
+	// Override with environment variables if set
+	if apiKey := os.Getenv("AZURE_OPENAI_API_KEY"); apiKey != "" && azureConfig.APIKey == "" {
+		azureConfig.APIKey = apiKey
+		log.Println("[Factory] Using AZURE_OPENAI_API_KEY from environment")
+	}
+
+	if endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT"); endpoint != "" && azureConfig.Endpoint == "" {
+		azureConfig.Endpoint = endpoint
+		log.Printf("[Factory] Using AZURE_OPENAI_ENDPOINT from environment: %s", endpoint)
+	}
+
+	if deploymentID := os.Getenv("AZURE_OPENAI_DEPLOYMENT"); deploymentID != "" {
+		azureConfig.DeploymentID = deploymentID
+		log.Printf("[Factory] Using AZURE_OPENAI_DEPLOYMENT from environment: %s", deploymentID)
+	}
+
+	if embedDeploymentID := os.Getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"); embedDeploymentID != "" {
+		azureConfig.EmbeddingDeploymentID = embedDeploymentID
+		log.Printf("[Factory] Using AZURE_OPENAI_EMBEDDING_DEPLOYMENT from environment: %s", embedDeploymentID)
+	}
+
+	if azureConfig.APIKey == "" || azureConfig.Endpoint == "" || azureConfig.DeploymentID == "" {
+		return nil, fmt.Errorf("Azure OpenAI requires API key, endpoint, and deployment ID")
+	}
+
+	provider, err := NewAzureProvider(azureConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure provider: %w", err)
+	}
+
+	log.Printf("[Factory] Created Azure provider (Endpoint: %s, Deployment: %s)", azureConfig.Endpoint, azureConfig.DeploymentID)
+
+	return provider, nil
+}
+
+// newBedrockProviderFromConfig creates an AWS Bedrock provider from the config.
+func newBedrockProviderFromConfig(config *Config) (LLMProvider, error) {
+	bedrockConfig := config.BedrockConfig
+	if bedrockConfig == nil {
+		// Try to get configuration from environment
+		region := os.Getenv("AWS_REGION")
+		if region == "" {
+			region = "us-east-1" // Default region
+		}
+
+		bedrockConfig = DefaultBedrockConfig(region)
+		log.Println("[Factory] Using default Bedrock configuration with environment variables")
+	}
+
+	// Override with environment variables if set
+	if region := os.Getenv("AWS_REGION"); region != "" {
+		bedrockConfig.Region = region
+		log.Printf("[Factory] Using AWS_REGION from environment: %s", region)
+	}
+
+	if model := os.Getenv("BEDROCK_MODEL"); model != "" {
+		bedrockConfig.Model = model
+		log.Printf("[Factory] Using BEDROCK_MODEL from environment: %s", model)
+	}
+
+	if embedModel := os.Getenv("BEDROCK_EMBEDDING_MODEL"); embedModel != "" {
+		bedrockConfig.EmbedModel = embedModel
+		log.Printf("[Factory] Using BEDROCK_EMBEDDING_MODEL from environment: %s", embedModel)
+	}
+
+	provider, err := NewBedrockProvider(bedrockConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Bedrock provider: %w", err)
+	}
+
+	log.Printf("[Factory] Created Bedrock provider (Region: %s, Model: %s)", bedrockConfig.Region, bedrockConfig.Model)
+
+	return provider, nil
+}
+
+// newCohereProviderFromConfig creates a Cohere provider from the config.
+func newCohereProviderFromConfig(config *Config) (LLMProvider, error) {
+	cohereConfig := config.CohereConfig
+	if cohereConfig == nil {
+		// Try to get API key from environment
+		apiKey := os.Getenv("COHERE_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("Cohere API key not provided in config or COHERE_API_KEY environment variable")
+		}
+		cohereConfig = DefaultCohereConfig(apiKey)
+		log.Println("[Factory] Using default Cohere configuration with environment API key")
+	}
+
+	// Override with environment variables if set
+	if apiKey := os.Getenv("COHERE_API_KEY"); apiKey != "" && cohereConfig.APIKey == "" {
+		cohereConfig.APIKey = apiKey
+		log.Println("[Factory] Using COHERE_API_KEY from environment")
+	}
+
+	if model := os.Getenv("COHERE_MODEL"); model != "" {
+		cohereConfig.Model = model
+		log.Printf("[Factory] Using COHERE_MODEL from environment: %s", model)
+	}
+
+	if embedModel := os.Getenv("COHERE_EMBEDDING_MODEL"); embedModel != "" {
+		cohereConfig.EmbedModel = embedModel
+		log.Printf("[Factory] Using COHERE_EMBEDDING_MODEL from environment: %s", embedModel)
+	}
+
+	if cohereConfig.APIKey == "" {
+		return nil, fmt.Errorf("Cohere API key is required")
+	}
+
+	provider, err := NewCohereProvider(cohereConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Cohere provider: %w", err)
+	}
+
+	log.Printf("[Factory] Created Cohere provider (Model: %s)", cohereConfig.Model)
+
+	return provider, nil
+}
+
 // NewProviderFromEnv creates a new LLM provider based on environment variables.
 // This is a convenience function for simple setups.
 //
 // Environment variables:
-//   - LLM_PROVIDER: "ollama", "openai", "claude", "gemini", or "groq" (default: "openai")
+//   - LLM_PROVIDER: "ollama", "openai", "claude", "gemini", "groq", "azure", "bedrock", or "cohere" (default: "openai")
 //   - OLLAMA_BASE_URL: Ollama API endpoint (default: http://localhost:11434)
 //   - OLLAMA_MODEL: Ollama model name (default: llama2)
 //   - OLLAMA_EMBED_MODEL: Ollama embedding model (default: nomic-embed-text)
@@ -258,6 +408,9 @@ func newGroqProviderFromConfig(config *Config) (LLMProvider, error) {
 //   - CLAUDE_API_KEY: Anthropic API key (required for Claude provider)
 //   - GEMINI_API_KEY: Google API key (required for Gemini provider)
 //   - GROQ_API_KEY: Groq API key (required for Groq provider)
+//   - AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT: Azure OpenAI configuration
+//   - AWS_REGION, BEDROCK_MODEL: AWS Bedrock configuration
+//   - COHERE_API_KEY: Cohere API key (required for Cohere provider)
 func NewProviderFromEnv() (LLMProvider, error) {
 	providerType := os.Getenv("LLM_PROVIDER")
 	if providerType == "" {
@@ -337,6 +490,48 @@ func NewProviderFromEnv() (LLMProvider, error) {
 			APIKey:       apiKey,
 			Model:        getEnvOrDefault("GROQ_MODEL", "mixtral-8x7b-32768"),
 			EmbedModel:   "",
+			Temperature:  0.7,
+			MaxTokens:    4096,
+			Instructions: "You are a helpful assistant.",
+		}
+	case "azure":
+		apiKey := os.Getenv("AZURE_OPENAI_API_KEY")
+		endpoint := os.Getenv("AZURE_OPENAI_ENDPOINT")
+		deploymentID := os.Getenv("AZURE_OPENAI_DEPLOYMENT")
+
+		if apiKey == "" || endpoint == "" || deploymentID == "" {
+			return nil, fmt.Errorf("Azure OpenAI requires AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, and AZURE_OPENAI_DEPLOYMENT environment variables")
+		}
+
+		config.AzureConfig = &AzureConfig{
+			APIKey:                apiKey,
+			Endpoint:              endpoint,
+			DeploymentID:          deploymentID,
+			EmbeddingDeploymentID: getEnvOrDefault("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-ada-002"),
+			APIVersion:            getEnvOrDefault("AZURE_OPENAI_API_VERSION", "2023-05-15"),
+			Temperature:           0.7,
+			MaxTokens:             2000,
+			Instructions:          "You are a helpful assistant.",
+		}
+	case "bedrock":
+		region := getEnvOrDefault("AWS_REGION", "us-east-1")
+		config.BedrockConfig = &BedrockConfig{
+			Region:       region,
+			Model:        getEnvOrDefault("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
+			EmbedModel:   getEnvOrDefault("BEDROCK_EMBEDDING_MODEL", "amazon.titan-embed-text-v2:0"),
+			Temperature:  0.7,
+			MaxTokens:    4096,
+			Instructions: "You are a helpful assistant.",
+		}
+	case "cohere":
+		apiKey := os.Getenv("COHERE_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("COHERE_API_KEY environment variable is required")
+		}
+		config.CohereConfig = &CohereConfig{
+			APIKey:       apiKey,
+			Model:        getEnvOrDefault("COHERE_MODEL", "command-r-plus"),
+			EmbedModel:   getEnvOrDefault("COHERE_EMBEDDING_MODEL", "embed-english-v3.0"),
 			Temperature:  0.7,
 			MaxTokens:    4096,
 			Instructions: "You are a helpful assistant.",

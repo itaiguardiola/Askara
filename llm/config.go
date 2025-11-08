@@ -19,6 +19,15 @@ type Config struct {
 
 	// GroqConfig holds Groq-specific configuration
 	GroqConfig *GroqConfig
+
+	// AzureConfig holds Azure OpenAI-specific configuration
+	AzureConfig *AzureConfig
+
+	// BedrockConfig holds AWS Bedrock-specific configuration
+	BedrockConfig *BedrockConfig
+
+	// CohereConfig holds Cohere-specific configuration
+	CohereConfig *CohereConfig
 }
 
 // OllamaConfig holds configuration for the Ollama provider.
@@ -176,6 +185,113 @@ func DefaultGroqConfig(apiKey string) *GroqConfig {
 		APIKey:       apiKey,
 		Model:        "mixtral-8x7b-32768",
 		EmbedModel:   "", // Groq doesn't provide embeddings
+		Temperature:  0.7,
+		MaxTokens:    4096,
+		Instructions: "You are a helpful assistant.",
+	}
+}
+
+// AzureConfig holds configuration for the Azure OpenAI provider.
+type AzureConfig struct {
+	// APIKey is the Azure OpenAI API key
+	APIKey string
+
+	// Endpoint is the Azure OpenAI endpoint (e.g., "https://your-resource.openai.azure.com/")
+	Endpoint string
+
+	// DeploymentID is the deployment name for completions
+	DeploymentID string
+
+	// EmbeddingDeploymentID is the deployment name for embeddings
+	EmbeddingDeploymentID string
+
+	// APIVersion is the Azure OpenAI API version (e.g., "2023-05-15")
+	APIVersion string
+
+	// Temperature controls randomness in generation (0.0 to 1.0)
+	Temperature float32
+
+	// MaxTokens is the maximum number of tokens to generate
+	MaxTokens int
+
+	// Instructions is the system message/instructions for the model
+	Instructions string
+}
+
+// BedrockConfig holds configuration for the AWS Bedrock provider.
+type BedrockConfig struct {
+	// Region is the AWS region (e.g., "us-east-1")
+	Region string
+
+	// Model is the model ID to use for completions (e.g., "anthropic.claude-3-5-sonnet-20241022-v2:0")
+	Model string
+
+	// EmbedModel is the model ID to use for embeddings (e.g., "amazon.titan-embed-text-v2:0")
+	EmbedModel string
+
+	// Temperature controls randomness in generation (0.0 to 1.0)
+	Temperature float32
+
+	// MaxTokens is the maximum number of tokens to generate
+	MaxTokens int
+
+	// Instructions is the system message/instructions for the model
+	Instructions string
+}
+
+// CohereConfig holds configuration for the Cohere provider.
+type CohereConfig struct {
+	// APIKey is the Cohere API key
+	APIKey string
+
+	// Model is the model name to use for completions (e.g., "command-r-plus", "command-r")
+	Model string
+
+	// EmbedModel is the model to use for embeddings (e.g., "embed-english-v3.0")
+	EmbedModel string
+
+	// Temperature controls randomness in generation (0.0 to 1.0)
+	Temperature float32
+
+	// MaxTokens is the maximum number of tokens to generate
+	MaxTokens int
+
+	// Instructions is the system message/instructions for the model
+	Instructions string
+}
+
+// DefaultAzureConfig returns a default Azure OpenAI configuration.
+func DefaultAzureConfig(apiKey, endpoint, deploymentID string) *AzureConfig {
+	return &AzureConfig{
+		APIKey:                apiKey,
+		Endpoint:              endpoint,
+		DeploymentID:          deploymentID,
+		EmbeddingDeploymentID: "text-embedding-ada-002", // Default embedding deployment
+		APIVersion:            "2023-05-15",
+		Temperature:           0.7,
+		MaxTokens:             2000,
+		Instructions:          "You are a helpful assistant.",
+	}
+}
+
+// DefaultBedrockConfig returns a default AWS Bedrock configuration.
+func DefaultBedrockConfig(region string) *BedrockConfig {
+	return &BedrockConfig{
+		Region:       region,
+		Model:        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+		EmbedModel:   "amazon.titan-embed-text-v2:0",
+		Temperature:  0.7,
+		MaxTokens:    4096,
+		Instructions: "You are a helpful assistant.",
+	}
+}
+
+// DefaultCohereConfig returns a default Cohere configuration with the given API key.
+func DefaultCohereConfig(apiKey string) *CohereConfig {
+	return &CohereConfig{
+		APIKey:       apiKey,
+		Model:        "command-r-plus",
+		EmbedModel:   "embed-english-v3.0",
 		Temperature:  0.7,
 		MaxTokens:    4096,
 		Instructions: "You are a helpful assistant.",

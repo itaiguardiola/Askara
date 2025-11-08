@@ -250,7 +250,7 @@ func (as *AutoSelector) SelectBestProvider() (*InstrumentedProvider, ProviderTyp
 	var bestProvider ProviderType
 	var bestScore float64 = -1
 
-	for providerType, provider := range as.providers {
+	for providerType, _ := range as.providers {
 		stats, exists := allStats[providerType]
 
 		// If no stats exist, give it a neutral score

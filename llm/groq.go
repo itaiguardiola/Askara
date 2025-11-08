@@ -52,8 +52,8 @@ func (g *GroqProvider) GenerateEmbedding(text string) ([]float32, error) {
 }
 
 // GenerateCompletion generates a completion using Groq.
-func (g *GroqProvider) GenerateCompletion(prompt string, context []string) (string, error) {
-	messages := g.buildMessages(prompt, context)
+func (g *GroqProvider) GenerateCompletion(prompt string, contextTexts []string) (string, error) {
+	messages := g.buildMessages(prompt, contextTexts)
 
 	req := openai.ChatCompletionRequest{
 		Model:       g.config.Model,
@@ -76,8 +76,8 @@ func (g *GroqProvider) GenerateCompletion(prompt string, context []string) (stri
 }
 
 // StreamCompletion generates a streaming completion using Groq.
-func (g *GroqProvider) StreamCompletion(prompt string, context []string, onChunk func(string)) error {
-	messages := g.buildMessages(prompt, context)
+func (g *GroqProvider) StreamCompletion(prompt string, contextTexts []string, onChunk func(string)) error {
+	messages := g.buildMessages(prompt, contextTexts)
 
 	req := openai.ChatCompletionRequest{
 		Model:       g.config.Model,
