@@ -8,8 +8,9 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/itaiguardiola/askara/prompt"
 )
 
 // OllamaProvider implements the LLMProvider interface using Ollama.
@@ -118,24 +119,26 @@ type ollamaGenerateResponse struct {
 	Done      bool   `json:"done"`
 }
 
-// buildPromptWithContext creates a prompt that includes the provided context.
-func (o *OllamaProvider) buildPromptWithContext(prompt string, contextTexts []string) string {
+// buildPromptWithContext creates an optimized prompt using the prompt builder package.
+func (o *OllamaProvider) buildPromptWithContext(userPrompt string, contextTexts []string) string {
 	if len(contextTexts) == 0 {
-		return prompt
+		return userPrompt
 	}
 
-	var sb strings.Builder
-	sb.WriteString("Use the following context to answer the question:\n\n")
-	sb.WriteString("Context:\n")
-	for i, ctx := range contextTexts {
-		sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, ctx))
-	}
-	sb.WriteString("\n")
-	sb.WriteString("Question: ")
-	sb.WriteString(prompt)
-	sb.WriteString("\n\nAnswer:")
+	// Use the prompt builder to create an optimized prompt
+	builder := prompt.NewBuilder()
+	result := builder.Build(userPrompt, contextTexts)
 
-	return sb.String()
+	log.Printf("[OllamaProvider] Using %s question type with temperature %.2f",
+		result.QuestionType.String(), result.Temperature)
+
+	// For Ollama, we combine system prompt and user prompt since it doesn't have separate system messages
+	// We'll prepend system instructions as context
+	if result.SystemPrompt != "" {
+		return fmt.Sprintf("System: %s\n\n%s", result.SystemPrompt, result.FinalPrompt)
+	}
+
+	return result.FinalPrompt
 }
 
 // GenerateCompletion generates a completion for the given prompt with context using Ollama.
