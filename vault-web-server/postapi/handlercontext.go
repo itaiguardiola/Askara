@@ -2,6 +2,7 @@ package postapi
 
 import (
 	"github.com/itaiguardiola/askara/llm"
+	"github.com/itaiguardiola/askara/metadata"
 	"github.com/itaiguardiola/askara/storage"
 	"github.com/itaiguardiola/askara/vectordb"
 
@@ -9,17 +10,19 @@ import (
 )
 
 type HandlerContext struct {
-	llmProvider llm.LLMProvider
-	cache       *cache.Cache
-	vectorDB    vectordb.VectorDB
-	docStore    storage.DocumentStore
+	llmProvider       llm.LLMProvider
+	cache             *cache.Cache
+	vectorDB          vectordb.VectorDB
+	docStore          storage.DocumentStore
+	metadataExtractor *metadata.MetadataExtractor
 }
 
 func NewHandlerContext(llmProvider llm.LLMProvider, vectorDB vectordb.VectorDB, docStore storage.DocumentStore) *HandlerContext {
 	return &HandlerContext{
-		llmProvider: llmProvider,
-		cache:       cache.New(cache.NoExpiration, cache.NoExpiration),
-		vectorDB:    vectorDB,
-		docStore:    docStore,
+		llmProvider:       llmProvider,
+		cache:             cache.New(cache.NoExpiration, cache.NoExpiration),
+		vectorDB:          vectorDB,
+		docStore:          docStore,
+		metadataExtractor: metadata.NewMetadataExtractor(llmProvider),
 	}
 }

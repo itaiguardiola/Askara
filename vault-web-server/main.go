@@ -107,13 +107,21 @@ func main() {
 	mx.HandleFunc("/api/questions", handlerContext.QuestionHandler).Methods("POST")
 	mx.HandleFunc("/api/questions/stream", handlerContext.StreamingQuestionHandler).Methods("POST")
 	mx.HandleFunc("/upload", handlerContext.UploadHandler).Methods("POST")
+	mx.HandleFunc("/api/documents/search/tags", handlerContext.SearchByTags).Methods("POST")
+	mx.HandleFunc("/api/documents/{documentId}/tags", handlerContext.AddTag).Methods("POST")
 
 	// Path Routing Rules: [GET]
 	mx.HandleFunc("/api/documents", handlerContext.ListDocumentsHandler).Methods("GET")
 	mx.HandleFunc("/api/documents/stats", handlerContext.GetDocumentStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/documents/tags", handlerContext.GetAllTags).Methods("GET")
+	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.GetMetadata).Methods("GET")
+
+	// Path Routing Rules: [PUT]
+	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.UpdateMetadata).Methods("PUT")
 
 	// Path Routing Rules: [DELETE]
 	mx.HandleFunc("/api/documents/{documentId}", handlerContext.DeleteDocumentHandler).Methods("DELETE")
+	mx.HandleFunc("/api/documents/{documentId}/tags/{tag}", handlerContext.RemoveTag).Methods("DELETE")
 
 	// Path Routing Rules: Static Handlers
 	mx.HandleFunc("/github", StaticRedirectHandler("https://github.com/pashpashpash/vault"))
