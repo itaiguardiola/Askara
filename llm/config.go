@@ -2,7 +2,7 @@ package llm
 
 // Config holds the configuration for LLM providers.
 type Config struct {
-	// Provider specifies which LLM provider to use ("ollama" or "openai")
+	// Provider specifies which LLM provider to use ("ollama", "openai", "claude", "gemini", "groq")
 	Provider string
 
 	// OllamaConfig holds Ollama-specific configuration
@@ -10,6 +10,15 @@ type Config struct {
 
 	// OpenAIConfig holds OpenAI-specific configuration
 	OpenAIConfig *OpenAIConfig
+
+	// ClaudeConfig holds Anthropic Claude-specific configuration
+	ClaudeConfig *ClaudeConfig
+
+	// GeminiConfig holds Google Gemini-specific configuration
+	GeminiConfig *GeminiConfig
+
+	// GroqConfig holds Groq-specific configuration
+	GroqConfig *GroqConfig
 }
 
 // OllamaConfig holds configuration for the Ollama provider.
@@ -70,6 +79,105 @@ func DefaultOpenAIConfig(apiKey string) *OpenAIConfig {
 		EmbedModel:   "text-embedding-ada-002",
 		Temperature:  0.7,
 		MaxTokens:    2000,
+		Instructions: "You are a helpful assistant.",
+	}
+}
+
+// ClaudeConfig holds configuration for the Anthropic Claude provider.
+type ClaudeConfig struct {
+	// APIKey is the Anthropic API key
+	APIKey string
+
+	// Model is the model name to use for completions (e.g., "claude-3-5-sonnet-20241022", "claude-3-opus-20240229")
+	Model string
+
+	// EmbedModel is the model/service to use for embeddings (using Voyage AI)
+	EmbedModel string
+
+	// Temperature controls randomness in generation (0.0 to 1.0)
+	Temperature float32
+
+	// MaxTokens is the maximum number of tokens to generate
+	MaxTokens int
+
+	// Instructions is the system message/instructions for the model
+	Instructions string
+}
+
+// GeminiConfig holds configuration for the Google Gemini provider.
+type GeminiConfig struct {
+	// APIKey is the Google API key
+	APIKey string
+
+	// Model is the model name to use for completions (e.g., "gemini-1.5-pro", "gemini-1.5-flash")
+	Model string
+
+	// EmbedModel is the model to use for embeddings (e.g., "text-embedding-004")
+	EmbedModel string
+
+	// Temperature controls randomness in generation (0.0 to 2.0)
+	Temperature float32
+
+	// MaxTokens is the maximum number of tokens to generate
+	MaxTokens int
+
+	// Instructions is the system message/instructions for the model
+	Instructions string
+}
+
+// GroqConfig holds configuration for the Groq provider.
+type GroqConfig struct {
+	// APIKey is the Groq API key
+	APIKey string
+
+	// Model is the model name to use for completions (e.g., "mixtral-8x7b-32768", "llama2-70b-4096")
+	Model string
+
+	// EmbedModel is not used by Groq (uses external embedding service or Ollama)
+	EmbedModel string
+
+	// Temperature controls randomness in generation (0.0 to 2.0)
+	Temperature float32
+
+	// MaxTokens is the maximum number of tokens to generate
+	MaxTokens int
+
+	// Instructions is the system message/instructions for the model
+	Instructions string
+}
+
+// DefaultClaudeConfig returns a default Claude configuration with the given API key.
+func DefaultClaudeConfig(apiKey string) *ClaudeConfig {
+	return &ClaudeConfig{
+		APIKey:       apiKey,
+		Model:        "claude-3-5-sonnet-20241022",
+		EmbedModel:   "voyage-large-2-instruct", // Voyage AI embedding
+		Temperature:  0.7,
+		MaxTokens:    4096,
+		Instructions: "You are a helpful assistant.",
+	}
+}
+
+// DefaultGeminiConfig returns a default Gemini configuration with the given API key.
+func DefaultGeminiConfig(apiKey string) *GeminiConfig {
+	return &GeminiConfig{
+		APIKey:       apiKey,
+		Model:        "gemini-1.5-flash",
+		EmbedModel:   "text-embedding-004",
+		Temperature:  0.7,
+		MaxTokens:    8192,
+		Instructions: "You are a helpful assistant.",
+	}
+}
+
+// DefaultGroqConfig returns a default Groq configuration with the given API key.
+func DefaultGroqConfig(apiKey string) *GroqConfig {
+	return &GroqConfig{
+		APIKey:       apiKey,
+		Model:        "mixtral-8x7b-32768",
+		EmbedModel:   "", // Groq doesn't provide embeddings
+		Temperature:  0.7,
+		MaxTokens:    4096,
 		Instructions: "You are a helpful assistant.",
 	}
 }
