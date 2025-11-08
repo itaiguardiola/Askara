@@ -10,21 +10,21 @@ import (
 
 // ProviderStatsResponse represents provider statistics for the API
 type ProviderStatsResponse struct {
-	Provider         string  `json:"provider"`
-	TotalRequests    int64   `json:"total_requests"`
-	SuccessfulReqs   int64   `json:"successful_requests"`
-	FailedReqs       int64   `json:"failed_requests"`
-	SuccessRate      float64 `json:"success_rate"`
-	AvgLatencyMs     float64 `json:"avg_latency_ms"`
-	P95LatencyMs     float64 `json:"p95_latency_ms"`
-	P99LatencyMs     float64 `json:"p99_latency_ms"`
-	TotalTokensIn    int64   `json:"total_tokens_in"`
-	TotalTokensOut   int64   `json:"total_tokens_out"`
-	TotalCost        float64 `json:"total_cost"`
-	LastSuccess      *string `json:"last_success,omitempty"`
-	LastFailure      *string `json:"last_failure,omitempty"`
-	IsHealthy        bool    `json:"is_healthy"`
-	HealthScore      float64 `json:"health_score"`
+	Provider       string  `json:"provider"`
+	TotalRequests  int64   `json:"total_requests"`
+	SuccessfulReqs int64   `json:"successful_requests"`
+	FailedReqs     int64   `json:"failed_requests"`
+	SuccessRate    float64 `json:"success_rate"`
+	AvgLatencyMs   float64 `json:"avg_latency_ms"`
+	P95LatencyMs   float64 `json:"p95_latency_ms"`
+	P99LatencyMs   float64 `json:"p99_latency_ms"`
+	TotalTokensIn  int64   `json:"total_tokens_in"`
+	TotalTokensOut int64   `json:"total_tokens_out"`
+	TotalCost      float64 `json:"total_cost"`
+	LastSuccess    *string `json:"last_success,omitempty"`
+	LastFailure    *string `json:"last_failure,omitempty"`
+	IsHealthy      bool    `json:"is_healthy"`
+	HealthScore    float64 `json:"health_score"`
 }
 
 // AllProvidersStatsResponse contains stats for all providers
@@ -42,16 +42,16 @@ type RecentMetricsResponse struct {
 
 // MetricResponse represents a single metric
 type MetricResponse struct {
-	Provider      string  `json:"provider"`
-	MetricType    string  `json:"metric_type"`
-	Timestamp     string  `json:"timestamp"`
-	LatencyMs     int64   `json:"latency_ms"`
-	Success       bool    `json:"success"`
-	ErrorMessage  string  `json:"error_message,omitempty"`
-	TokensInput   int     `json:"tokens_input,omitempty"`
-	TokensOutput  int     `json:"tokens_output,omitempty"`
-	Model         string  `json:"model,omitempty"`
-	CostEstimate  float64 `json:"cost_estimate,omitempty"`
+	Provider     string  `json:"provider"`
+	MetricType   string  `json:"metric_type"`
+	Timestamp    string  `json:"timestamp"`
+	LatencyMs    int64   `json:"latency_ms"`
+	Success      bool    `json:"success"`
+	ErrorMessage string  `json:"error_message,omitempty"`
+	TokensInput  int     `json:"tokens_input,omitempty"`
+	TokensOutput int     `json:"tokens_output,omitempty"`
+	Model        string  `json:"model,omitempty"`
+	CostEstimate float64 `json:"cost_estimate,omitempty"`
 }
 
 // GetProviderStatsHandler returns statistics for all providers
@@ -201,11 +201,11 @@ func (ctx *HandlerContext) GetProviderHealthHandler(w http.ResponseWriter, r *ht
 	healthStatus := make(map[string]interface{})
 	for providerType, stats := range allStats {
 		healthStatus[string(providerType)] = map[string]interface{}{
-			"is_healthy":    stats.IsHealthy,
-			"health_score":  stats.HealthScore,
-			"success_rate":  stats.SuccessRate,
-			"avg_latency":   stats.AvgLatencyMs,
-			"total_requests": stats.TotalRequests,
+			"is_healthy":      stats.IsHealthy,
+			"health_score":    stats.HealthScore,
+			"success_rate":    stats.SuccessRate,
+			"avg_latency":     stats.AvgLatencyMs,
+			"total_requests":  stats.TotalRequests,
 			"failed_requests": stats.FailedReqs,
 		}
 	}

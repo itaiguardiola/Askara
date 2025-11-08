@@ -23,12 +23,12 @@ const (
 
 // ProviderManager manages multiple LLM providers with auto-selection and failover
 type ProviderManager struct {
-	mode          ProviderMode
-	collector     *MetricsCollector
-	autoSelector  *AutoSelector
+	mode           ProviderMode
+	collector      *MetricsCollector
+	autoSelector   *AutoSelector
 	singleProvider *InstrumentedProvider
-	providerType  ProviderType
-	mu            sync.RWMutex
+	providerType   ProviderType
+	mu             sync.RWMutex
 
 	// Configuration
 	enableMetrics bool
@@ -37,9 +37,9 @@ type ProviderManager struct {
 
 // ProviderManagerConfig holds configuration for the provider manager
 type ProviderManagerConfig struct {
-	Mode           ProviderMode
-	EnableMetrics  bool
-	MetricsPath    string
+	Mode            ProviderMode
+	EnableMetrics   bool
+	MetricsPath     string
 	SelectorWeights *SelectorWeights
 }
 
@@ -47,9 +47,9 @@ type ProviderManagerConfig struct {
 func DefaultProviderManagerConfig() *ProviderManagerConfig {
 	weights := DefaultSelectorWeights()
 	return &ProviderManagerConfig{
-		Mode:           ProviderModeSingle,
-		EnableMetrics:  true,
-		MetricsPath:    "./data/llm_metrics.json",
+		Mode:            ProviderModeSingle,
+		EnableMetrics:   true,
+		MetricsPath:     "./data/llm_metrics.json",
 		SelectorWeights: &weights,
 	}
 }

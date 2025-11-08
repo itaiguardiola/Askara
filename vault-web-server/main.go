@@ -129,6 +129,11 @@ func main() {
 	mx.HandleFunc("/api/config", handlerContext.GetConfigHandler).Methods("GET")
 	mx.HandleFunc("/api/config/ollama/models", handlerContext.ListOllamaModelsHandler).Methods("GET")
 
+	// Provider Analytics Endpoints (new feature)
+	mx.HandleFunc("/api/providers/stats", handlerContext.GetProviderStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/metrics", handlerContext.GetRecentMetricsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/health", handlerContext.GetProviderHealthHandler).Methods("GET")
+
 	// Path Routing Rules: [DELETE]
 	mx.HandleFunc("/api/documents/{documentId}", handlerContext.DeleteDocumentHandler).Methods("DELETE")
 
