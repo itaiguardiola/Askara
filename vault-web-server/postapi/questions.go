@@ -145,6 +145,31 @@ func (ctx *HandlerContext) QuestionHandler(w http.ResponseWriter, r *http.Reques
 	}
 	log.Println("[QuestionHandler] Retrieved context from vector DB:\n", contexts)
 
+	// Enhance contexts with code-aware grounding (if enabled)
+	if ctx.codeTrustSvc != nil {
+		// Convert contexts to map format for enhancement
+		contextMaps := make([]map[string]interface{}, len(contexts))
+		for i, c := range contexts {
+			contextMaps[i] = map[string]interface{}{
+				"text":  c.Text,
+				"title": c.Title,
+			}
+		}
+
+		enhancedMaps, err := ctx.codeTrustSvc.EnhanceContext(form.UUID, form.Question, contextMaps)
+		if err != nil {
+			log.Printf("[QuestionHandler WARN] Code grounding failed: %v", err)
+		} else if len(enhancedMaps) > len(contextMaps) {
+			// Grounding metadata was added - convert back to Context format
+			contexts = make([]Context, len(enhancedMaps))
+			for i, m := range enhancedMaps {
+				contexts[i].Text = m["text"].(string)
+				contexts[i].Title = m["title"].(string)
+			}
+			log.Printf("[QuestionHandler] Enhanced with code-aware grounding")
+		}
+	}
+
 	// step 3: Structure the prompt with a context section + question, using top x results from vector DB as the context
 	contextTexts := make([]string, len(contexts))
 	for i, context := range contexts {
@@ -307,6 +332,31 @@ func (ctx *HandlerContext) StreamingQuestionHandler(w http.ResponseWriter, r *ht
 	for i, match := range matches {
 		contexts[i].Text = match.Metadata["text"]
 		contexts[i].Title = match.Metadata["title"]
+	}
+
+	// Enhance contexts with code-aware grounding (if enabled)
+	if ctx.codeTrustSvc != nil {
+		// Convert contexts to map format for enhancement
+		contextMaps := make([]map[string]interface{}, len(contexts))
+		for i, c := range contexts {
+			contextMaps[i] = map[string]interface{}{
+				"text":  c.Text,
+				"title": c.Title,
+			}
+		}
+
+		enhancedMaps, err := ctx.codeTrustSvc.EnhanceContext(form.UUID, form.Question, contextMaps)
+		if err != nil {
+			log.Printf("[StreamingQuestionHandler WARN] Code grounding failed: %v", err)
+		} else if len(enhancedMaps) > len(contextMaps) {
+			// Grounding metadata was added - convert back to Context format
+			contexts = make([]Context, len(enhancedMaps))
+			for i, m := range enhancedMaps {
+				contexts[i].Text = m["text"].(string)
+				contexts[i].Title = m["title"].(string)
+			}
+			log.Printf("[StreamingQuestionHandler] Enhanced with code-aware grounding")
+		}
 	}
 
 	// Send context to the client first

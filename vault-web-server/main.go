@@ -16,6 +16,7 @@ import (
 	"compress/gzip"
 	"io"
 
+	"github.com/itaiguardiola/askara/codesourcetrust"
 	"github.com/itaiguardiola/askara/llm"
 	"github.com/itaiguardiola/askara/mlworker"
 	"github.com/itaiguardiola/askara/queryrewriter"
@@ -106,7 +107,23 @@ func main() {
 		log.Println("[QueryRewriter] Disabled - set QUERY_REWRITE_ENABLED=true to enable")
 	}
 
-	handlerContext := postapi.NewHandlerContext(llmProvider, vectorDB, docStore, queryRewriter)
+	// Initialize Code Source Trust service for code grounding
+	codeTrustEnabled := os.Getenv("CODE_TRUST_ENABLED") != "false" // Enabled by default
+	var codeTrustSvc *codesourcetrust.Service
+	if codeTrustEnabled {
+		config := codesourcetrust.DefaultExtractionConfig()
+		codeTrustSvc, err = codesourcetrust.NewService("data", config)
+		if err != nil {
+			log.Println("[CodeSourceTrust] WARNING: Failed to initialize:", err)
+			codeTrustSvc = nil
+		} else {
+			log.Println("[CodeSourceTrust] Enabled - extracting code symbols from documents for enhanced grounding")
+		}
+	} else {
+		log.Println("[CodeSourceTrust] Disabled - set CODE_TRUST_ENABLED=true to enable")
+	}
+
+	handlerContext := postapi.NewHandlerContext(llmProvider, vectorDB, docStore, queryRewriter, codeTrustSvc)
 
 	// Configure main web server
 	server := negroni.New()
@@ -122,15 +139,36 @@ func main() {
 	mx.HandleFunc("/api/questions/stream", handlerContext.StreamingQuestionHandler).Methods("POST")
 	mx.HandleFunc("/upload", handlerContext.UploadHandler).Methods("POST")
 	mx.HandleFunc("/api/config/test", handlerContext.TestConnectionHandler).Methods("POST")
+	mx.HandleFunc("/api/codetrust/ground", handlerContext.GroundQueryHandler).Methods("POST")
+	mx.HandleFunc("/api/documents/search/tags", handlerContext.SearchByTags).Methods("POST")
+	mx.HandleFunc("/api/documents/{documentId}/tags", handlerContext.AddTag).Methods("POST")
 
 	// Path Routing Rules: [GET]
 	mx.HandleFunc("/api/documents", handlerContext.ListDocumentsHandler).Methods("GET")
 	mx.HandleFunc("/api/documents/stats", handlerContext.GetDocumentStatsHandler).Methods("GET")
 	mx.HandleFunc("/api/config", handlerContext.GetConfigHandler).Methods("GET")
 	mx.HandleFunc("/api/config/ollama/models", handlerContext.ListOllamaModelsHandler).Methods("GET")
+	mx.HandleFunc("/api/documents/tags", handlerContext.GetAllTags).Methods("GET")
+	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.GetMetadata).Methods("GET")
+
+	// Code Source Trust endpoints
+	mx.HandleFunc("/api/codetrust/stats", handlerContext.GetCodeTrustStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/codetrust/symbols", handlerContext.SearchSymbolsHandler).Methods("GET")
+	mx.HandleFunc("/api/codetrust/apis", handlerContext.SearchAPIsHandler).Methods("GET")
+	mx.HandleFunc("/api/codetrust/index", handlerContext.GetCodeTrustIndexHandler).Methods("GET")
+	mx.HandleFunc("/api/codetrust/enrichment/{documentId}", handlerContext.GetDocumentEnrichmentHandler).Methods("GET")
+
+	// Path Routing Rules: [PUT]
+	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.UpdateMetadata).Methods("PUT")
+
+	// Provider Analytics Endpoints (new feature)
+	mx.HandleFunc("/api/providers/stats", handlerContext.GetProviderStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/metrics", handlerContext.GetRecentMetricsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/health", handlerContext.GetProviderHealthHandler).Methods("GET")
 
 	// Path Routing Rules: [DELETE]
 	mx.HandleFunc("/api/documents/{documentId}", handlerContext.DeleteDocumentHandler).Methods("DELETE")
+	mx.HandleFunc("/api/documents/{documentId}/tags/{tag}", handlerContext.RemoveTag).Methods("DELETE")
 
 	// Path Routing Rules: Static Handlers
 	mx.HandleFunc("/github", StaticRedirectHandler("https://github.com/pashpashpash/vault"))

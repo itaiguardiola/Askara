@@ -200,6 +200,17 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 
 		log.Println("Successfully added vector DB embeddings!")
 
+		// Extract metadata using ML
+		log.Println("[UploadHandler] Extracting metadata with ML...")
+		docMetadata, err := ctx.metadataExtractor.ExtractMetadata(fileContent, fileName)
+		if err != nil {
+			log.Printf("[UploadHandler WARN] Failed to extract metadata: %v", err)
+			// Create basic metadata as fallback
+			docMetadata = storage.NewDocumentMetadata(fileName)
+		}
+		log.Printf("[UploadHandler] Metadata extracted: %d tags, summary length: %d chars",
+			len(docMetadata.AutoTags), len(docMetadata.Summary))
+
 		// Save document metadata
 		doc := storage.Document{
 			ID:           docID,
@@ -212,11 +223,22 @@ func (ctx *HandlerContext) UploadHandler(w http.ResponseWriter, r *http.Request)
 			ContentType:  fileType,
 			FirstChunkID: storage.GenerateChunkID(uuid, docID, 0),
 			LastChunkID:  storage.GenerateChunkID(uuid, docID, len(chunks)-1),
+			Metadata:     docMetadata,
 		}
 
 		if err := ctx.docStore.SaveDocument(&doc); err != nil {
 			log.Printf("[UploadHandler WARN] Failed to save document metadata: %v", err)
 			// Continue anyway - the vectors are uploaded
+		}
+
+		// Extract code symbols and build source of truth (if enabled)
+		if ctx.codeTrustSvc != nil {
+			go func(docID, fileName, uuid, content string) {
+				_, err := ctx.codeTrustSvc.ProcessDocument(docID, fileName, uuid, content)
+				if err != nil {
+					log.Printf("[CodeSourceTrust] Failed to process document %s: %v", fileName, err)
+				}
+			}(docID, fileName, uuid, fileContent)
 		}
 
 		responseData.NumFilesSucceeded++

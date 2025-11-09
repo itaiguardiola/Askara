@@ -16,16 +16,17 @@ import (
 
 // Document represents metadata about an uploaded document
 type Document struct {
-	ID           string    `json:"id"`
-	UUID         string    `json:"uuid"`
-	Filename     string    `json:"filename"`
-	FileSize     int64     `json:"file_size"`
-	ContentHash  string    `json:"content_hash"` // SHA256 hash of file content for deduplication
-	UploadDate   time.Time `json:"upload_date"`
-	ChunkCount   int       `json:"chunk_count"`
-	ContentType  string    `json:"content_type"`
-	FirstChunkID string    `json:"first_chunk_id"`
-	LastChunkID  string    `json:"last_chunk_id"`
+	ID           string            `json:"id"`
+	UUID         string            `json:"uuid"`
+	Filename     string            `json:"filename"`
+	FileSize     int64             `json:"file_size"`
+	ContentHash  string            `json:"content_hash"`        // SHA256 hash of file content for deduplication
+	UploadDate   time.Time         `json:"upload_date"`
+	ChunkCount   int               `json:"chunk_count"`
+	ContentType  string            `json:"content_type"`
+	FirstChunkID string            `json:"first_chunk_id"`
+	LastChunkID  string            `json:"last_chunk_id"`
+	Metadata     *DocumentMetadata `json:"metadata,omitempty"` // Rich metadata with ML tags
 }
 
 // DocumentStats represents usage statistics for a user
@@ -44,6 +45,8 @@ type DocumentStore interface {
 	GetDocument(uuid, docID string) (*Document, error)
 	DeleteDocument(uuid, docID string) error
 	GetStats(uuid string) (*DocumentStats, error)
+	UpdateMetadata(uuid, docID string, metadata *DocumentMetadata) error
+	SearchByTags(uuid string, tags []string) ([]Document, error)
 }
 
 // JSONDocumentStore implements DocumentStore using JSON files
@@ -277,6 +280,70 @@ func (s *JSONDocumentStore) GetStats(uuid string) (*DocumentStats, error) {
 	}
 
 	return stats, nil
+}
+
+// UpdateMetadata updates the metadata for a specific document
+func (s *JSONDocumentStore) UpdateMetadata(uuid, docID string, metadata *DocumentMetadata) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	docs, err := s.loadUserDocuments(uuid)
+	if err != nil {
+		return err
+	}
+
+	// Find and update the document
+	for i, doc := range docs.Documents {
+		if doc.ID == docID {
+			metadata.LastModified = time.Now()
+			metadata.Version++
+			docs.Documents[i].Metadata = metadata
+			return s.saveUserDocuments(uuid, docs)
+		}
+	}
+
+	return fmt.Errorf("document not found")
+}
+
+// SearchByTags searches for documents that have any of the specified tags
+func (s *JSONDocumentStore) SearchByTags(uuid string, tags []string) ([]Document, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	docs, err := s.loadUserDocuments(uuid)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tags) == 0 {
+		return docs.Documents, nil
+	}
+
+	var results []Document
+	for _, doc := range docs.Documents {
+		if doc.Metadata == nil {
+			continue
+		}
+
+		// Check if any of the search tags match document tags
+		docTags := doc.Metadata.GetAllTags()
+		for _, searchTag := range tags {
+			for _, docTag := range docTags {
+				if searchTag == docTag {
+					results = append(results, doc)
+					goto nextDoc // Found a match, move to next document
+				}
+			}
+		}
+	nextDoc:
+	}
+
+	// Sort by upload date (newest first)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].UploadDate.After(results[j].UploadDate)
+	})
+
+	return results, nil
 }
 
 // FindDocumentByContentHash finds a document with the same content hash for a given UUID
