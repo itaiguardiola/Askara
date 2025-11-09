@@ -30,9 +30,9 @@ type GeminiPart struct {
 
 // GeminiRequest represents a request to Gemini API
 type GeminiRequest struct {
-	Contents         []GeminiContent           `json:"contents"`
-	SystemInstruction *GeminiContent           `json:"systemInstruction,omitempty"`
-	GenerationConfig *GeminiGenerationConfig  `json:"generationConfig,omitempty"`
+	Contents          []GeminiContent         `json:"contents"`
+	SystemInstruction *GeminiContent          `json:"systemInstruction,omitempty"`
+	GenerationConfig  *GeminiGenerationConfig `json:"generationConfig,omitempty"`
 }
 
 // GeminiGenerationConfig holds generation configuration
@@ -66,8 +66,8 @@ type GeminiResponse struct {
 
 // GeminiEmbeddingRequest represents a request to Gemini embeddings API
 type GeminiEmbeddingRequest struct {
-	Content GeminiContent `json:"content"`
-	TaskType string       `json:"taskType,omitempty"`
+	Content  GeminiContent `json:"content"`
+	TaskType string        `json:"taskType,omitempty"`
 }
 
 // GeminiEmbeddingResponse represents a response from Gemini embeddings API

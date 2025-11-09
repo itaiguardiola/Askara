@@ -54,9 +54,9 @@ type ClaudeResponse struct {
 
 // ClaudeStreamEvent represents a streaming event from Claude API
 type ClaudeStreamEvent struct {
-	Type         string `json:"type"`
-	Index        int    `json:"index,omitempty"`
-	Delta        *struct {
+	Type  string `json:"type"`
+	Index int    `json:"index,omitempty"`
+	Delta *struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"delta,omitempty"`

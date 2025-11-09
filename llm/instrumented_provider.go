@@ -8,10 +8,10 @@ import (
 
 // InstrumentedProvider wraps an LLMProvider with metrics collection
 type InstrumentedProvider struct {
-	provider  LLMProvider
+	provider     LLMProvider
 	providerType ProviderType
-	collector *MetricsCollector
-	model     string
+	collector    *MetricsCollector
+	model        string
 }
 
 // NewInstrumentedProvider creates a new instrumented provider
@@ -32,13 +32,13 @@ func (ip *InstrumentedProvider) GenerateEmbedding(text string) ([]float32, error
 
 	// Record metric
 	metric := ProviderMetric{
-		Provider:     ip.providerType,
-		MetricType:   MetricTypeEmbedding,
-		Timestamp:    time.Now(),
-		LatencyMs:    time.Since(start).Milliseconds(),
-		Success:      err == nil,
-		Model:        ip.model,
-		TokensInput:  len(text) / 4, // Rough estimate
+		Provider:    ip.providerType,
+		MetricType:  MetricTypeEmbedding,
+		Timestamp:   time.Now(),
+		LatencyMs:   time.Since(start).Milliseconds(),
+		Success:     err == nil,
+		Model:       ip.model,
+		TokensInput: len(text) / 4, // Rough estimate
 	}
 
 	if err != nil {
@@ -198,18 +198,18 @@ func (ip *InstrumentedProvider) estimateCompletionCost(inputTokens, outputTokens
 
 // AutoSelector automatically selects the best provider based on metrics
 type AutoSelector struct {
-	providers  map[ProviderType]*InstrumentedProvider
-	collector  *MetricsCollector
+	providers     map[ProviderType]*InstrumentedProvider
+	collector     *MetricsCollector
 	fallbackOrder []ProviderType
-	weights    SelectorWeights
+	weights       SelectorWeights
 }
 
 // SelectorWeights defines the weights for auto-selection criteria
 type SelectorWeights struct {
-	HealthScore   float64 // 0-1
-	LatencyScore  float64 // 0-1
-	CostScore     float64 // 0-1
-	SuccessRate   float64 // 0-1
+	HealthScore  float64 // 0-1
+	LatencyScore float64 // 0-1
+	CostScore    float64 // 0-1
+	SuccessRate  float64 // 0-1
 }
 
 // DefaultSelectorWeights returns sensible default weights
@@ -250,7 +250,7 @@ func (as *AutoSelector) SelectBestProvider() (*InstrumentedProvider, ProviderTyp
 	var bestProvider ProviderType
 	var bestScore float64 = -1
 
-	for providerType, _ := range as.providers {
+	for providerType := range as.providers {
 		stats, exists := allStats[providerType]
 
 		// If no stats exist, give it a neutral score

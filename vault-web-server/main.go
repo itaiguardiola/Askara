@@ -161,6 +161,11 @@ func main() {
 	// Path Routing Rules: [PUT]
 	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.UpdateMetadata).Methods("PUT")
 
+	// Provider Analytics Endpoints (new feature)
+	mx.HandleFunc("/api/providers/stats", handlerContext.GetProviderStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/metrics", handlerContext.GetRecentMetricsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/health", handlerContext.GetProviderHealthHandler).Methods("GET")
+
 	// Path Routing Rules: [DELETE]
 	mx.HandleFunc("/api/documents/{documentId}", handlerContext.DeleteDocumentHandler).Methods("DELETE")
 	mx.HandleFunc("/api/documents/{documentId}/tags/{tag}", handlerContext.RemoveTag).Methods("DELETE")
