@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Upload, File, X, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Upload, File, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 
@@ -11,6 +11,10 @@ export function DocumentUpload({ onUpload }: DocumentUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [uploadComplete, setUploadComplete] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -41,14 +45,49 @@ export function DocumentUpload({ onUpload }: DocumentUploadProps) {
   const handleUpload = async () => {
     if (selectedFiles.length > 0 && !isUploading) {
       setIsUploading(true);
+      setUploadProgress(0);
+      setUploadStatus('Preparing upload...');
+      setUploadComplete(false);
+      setUploadError('');
+
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev < 90) return prev + 1;
+          return prev;
+        });
+      }, 200);
+
       try {
+        // Update status messages during upload
+        setTimeout(() => setUploadStatus('Uploading files...'), 500);
+        setTimeout(() => setUploadStatus('Processing document with ML Worker...'), 2000);
+        setTimeout(() => setUploadStatus('Extracting text and generating embeddings...'), 10000);
+        setTimeout(() => setUploadStatus('Almost done, finalizing...'), 30000);
+
         await onUpload(selectedFiles);
-        setSelectedFiles([]);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        setUploadStatus('Upload complete!');
+        setUploadComplete(true);
+
+        // Clear files after successful upload
+        setTimeout(() => {
+          setSelectedFiles([]);
+          setUploadProgress(0);
+          setUploadStatus('');
+          setUploadComplete(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }, 2000);
       } catch (error) {
+        clearInterval(progressInterval);
         console.error('Upload error in component:', error);
+        setUploadError(error instanceof Error ? error.message : 'Upload failed');
+        setUploadStatus('Upload failed');
+        setUploadProgress(0);
       } finally {
         setIsUploading(false);
       }
@@ -95,7 +134,7 @@ export function DocumentUpload({ onUpload }: DocumentUploadProps) {
       {selectedFiles.length > 0 && (
         <Card className="p-4">
           <h4 className="mb-3">Selected Files ({selectedFiles.length})</h4>
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 mb-4 max-h-[40vh] overflow-y-auto pr-2">
             {selectedFiles.map((file, index) => (
               <div
                 key={index}
@@ -117,18 +156,55 @@ export function DocumentUpload({ onUpload }: DocumentUploadProps) {
               </div>
             ))}
           </div>
+          {/* Progress Bar */}
+          {(isUploading || uploadComplete || uploadError) && (
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  {isUploading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                  {uploadComplete && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                  {uploadError && <AlertCircle className="h-4 w-4 text-red-500" />}
+                  <span className={uploadComplete ? 'text-green-600' : uploadError ? 'text-red-600' : ''}>
+                    {uploadStatus}
+                  </span>
+                </div>
+                {isUploading && <span className="text-muted-foreground">{uploadProgress}%</span>}
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    uploadComplete ? 'bg-green-500' :
+                    uploadError ? 'bg-red-500' :
+                    'bg-primary'
+                  }`}
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              {uploadError && (
+                <p className="text-sm text-red-600">{uploadError}</p>
+              )}
+            </div>
+          )}
+
           <Button
             onClick={handleUpload}
             disabled={isUploading}
             size="default"
+            className="w-full"
           >
             {isUploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Uploading...
               </>
+            ) : uploadComplete ? (
+              <>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Upload Complete
+              </>
             ) : (
               <>
+                <Upload className="mr-2 h-4 w-4" />
                 Upload {selectedFiles.length} {selectedFiles.length === 1 ? 'File' : 'Files'}
               </>
             )}

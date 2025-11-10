@@ -23,13 +23,7 @@ import (
 	"io"
 
 	"code.sajari.com/docconv"
-	"github.com/gen2brain/go-fitz"
-	"github.com/otiai10/gosseract/v2"
 	"github.com/itaiguardiola/askara/mlworker"
-	"image/png"
-	"os"
-	"path/filepath"
-	"encoding/base64"
 )
 
 type Chunk struct {
@@ -175,19 +169,9 @@ func GetTextFromFile(f multipart.File) (string, error) {
 		text = strings.TrimSpace(text)
 	case "application/epub+zip": // .epub
 		log.Println("[GetTextfromFile] .epub file encountered...")
-		fitzDoc, err := fitz.NewFromReader(bytes.NewReader(content))
+		text, err = extractEPUBTextLocal(content)
 		if err != nil {
 			return "", fmt.Errorf("error reading .epub file: %v", err)
-		}
-		defer fitzDoc.Close()
-		for i := 0; i < fitzDoc.NumPage(); i++ {
-			pageText, err := fitzDoc.Text(i)
-			if err != nil {
-				return "", fmt.Errorf("error getting text from page %d: %v", i, err)
-			}
-			// Preprocess the text by replacing newline characters with spaces
-			pageText = strings.ReplaceAll(pageText, "\n", " ")
-			text += pageText
 		}
 	default: // Assume plain text
 		detector := chardet.NewTextDetector()
@@ -246,123 +230,6 @@ func isTextExtractionPoor(text string) bool {
 	return false
 }
 
-// extractTextWithOCR uses go-fitz to render pages and Tesseract for OCR
-func extractTextWithOCR(f multipart.File) (string, error) {
-	log.Println("[extractTextWithOCR] Using OCR fallback for PDF")
-
-	// Reset file position
-	_, err := f.Seek(0, io.SeekStart)
-	if err != nil {
-		return "", fmt.Errorf("seek error: %v", err)
-	}
-
-	// Read file content
-	content, err := ioutil.ReadAll(f)
-	if err != nil {
-		return "", fmt.Errorf("read error: %v", err)
-	}
-
-	// Open PDF with go-fitz
-	doc, err := fitz.NewFromMemory(content)
-	if err != nil {
-		return "", fmt.Errorf("fitz error: %v", err)
-	}
-	defer doc.Close()
-
-	var fullText strings.Builder
-	numPages := doc.NumPage()
-	log.Printf("[extractTextWithOCR] Processing %d pages with OCR", numPages)
-
-	// Create temp directory for images
-	tempDir, err := ioutil.TempDir("", "pdf-ocr-*")
-	if err != nil {
-		return "", fmt.Errorf("temp dir error: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Get ML Worker client
-	mlClient := mlworker.GetClient()
-
-	// Process each page
-	for pageNum := 0; pageNum < numPages; pageNum++ {
-		// Render page as image (150 DPI for good OCR quality)
-		img, err := doc.Image(pageNum)
-		if err != nil {
-			log.Printf("[extractTextWithOCR] Page %d render error: %v", pageNum, err)
-			continue
-		}
-
-		// Save image to temp file
-		imgPath := filepath.Join(tempDir, fmt.Sprintf("page_%d.png", pageNum))
-		imgFile, err := os.Create(imgPath)
-		if err != nil {
-			log.Printf("[extractTextWithOCR] Page %d create file error: %v", pageNum, err)
-			continue
-		}
-
-		err = png.Encode(imgFile, img)
-		imgFile.Close()
-		if err != nil {
-			log.Printf("[extractTextWithOCR] Page %d encode error: %v", pageNum, err)
-			continue
-		}
-
-		var pageText string
-
-		// Try ML Worker OCR if enabled
-		if mlClient.IsFeatureEnabled("ocr") {
-			log.Printf("[extractTextWithOCR] Page %d: Attempting ML Worker OCR", pageNum)
-
-			// Read image and convert to base64 data URL
-			imgData, err := ioutil.ReadFile(imgPath)
-			if err == nil {
-				b64Data := base64.StdEncoding.EncodeToString(imgData)
-				dataURL := "data:image/png;base64," + b64Data
-
-				// Call ML Worker OCR
-				ocrResp, err := mlClient.OCR(dataURL, "eng", true)
-				if err == nil && ocrResp != nil {
-					pageText = ocrResp.Text
-					log.Printf("[extractTextWithOCR] Page %d: ML Worker OCR success (%.2f%% confidence)",
-						pageNum, ocrResp.Confidence*100)
-				} else {
-					log.Printf("[extractTextWithOCR] Page %d: ML Worker OCR failed: %v, falling back to Tesseract",
-						pageNum, err)
-				}
-			}
-		}
-
-		// Fall back to local Tesseract if ML Worker didn't work
-		if pageText == "" {
-			log.Printf("[extractTextWithOCR] Page %d: Using local Tesseract OCR", pageNum)
-			client := gosseract.NewClient()
-			defer client.Close()
-
-			client.SetImage(imgPath)
-			client.SetLanguage("eng")
-
-			pageText, err = client.Text()
-			if err != nil {
-				log.Printf("[extractTextWithOCR] Page %d OCR error: %v", pageNum, err)
-				os.Remove(imgPath)
-				continue
-			}
-		}
-
-		// Add page text to result
-		fullText.WriteString(pageText)
-		fullText.WriteString("\n")
-
-		// Clean up image file
-		os.Remove(imgPath)
-	}
-
-	result := strings.TrimSpace(fullText.String())
-	log.Printf("[extractTextWithOCR] OCR extracted %d characters", len(result))
-
-	return result, nil
-}
-
 // tryMLWorkerParsing attempts to parse document using ML Worker (Docling)
 func tryMLWorkerParsing(content []byte, fileType string) (string, error) {
 	mlClient := mlworker.GetClient()
@@ -371,14 +238,26 @@ func tryMLWorkerParsing(content []byte, fileType string) (string, error) {
 		return "", fmt.Errorf("ML Worker parse feature not enabled")
 	}
 
-	log.Println("[tryMLWorkerParsing] Attempting ML Worker document parsing (Docling)")
+	log.Printf("[tryMLWorkerParsing] Attempting ML Worker document parsing (Docling) - file size: %d bytes", len(content))
 
-	// Convert file content to base64 data URL
-	b64Data := base64.StdEncoding.EncodeToString(content)
-	dataURL := fmt.Sprintf("data:%s;base64,%s", fileType, b64Data)
+	// Use multipart upload for all files (supports large files)
+	// Generate a filename based on file type
+	filename := "document"
+	switch fileType {
+	case "application/pdf":
+		filename = "document.pdf"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		filename = "document.docx"
+	case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		filename = "document.pptx"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		filename = "document.xlsx"
+	default:
+		filename = "document.bin"
+	}
 
-	// Call ML Worker parse endpoint
-	parseResp, err := mlClient.ParseDocument(dataURL, true, true)
+	// Call ML Worker parse endpoint with multipart upload
+	parseResp, err := mlClient.ParseDocumentMultipart(content, filename, fileType, true, true)
 	if err != nil {
 		return "", fmt.Errorf("ML Worker parsing failed: %w", err)
 	}
@@ -416,7 +295,29 @@ func tryMLWorkerParsing(content []byte, fileType string) (string, error) {
 	return fullText, nil
 }
 
-// extract human-readable text from a given pdf with hybrid approach: try ML Worker (Docling) -> docconv -> OCR
+// tryPyMuPDFParsing attempts to parse PDF using PyMuPDF4LLM via ML Worker
+func tryPyMuPDFParsing(content []byte) (string, error) {
+	mlClient := mlworker.GetClient()
+
+	if !mlClient.IsFeatureEnabled("pymupdf") {
+		return "", fmt.Errorf("PyMuPDF feature not enabled")
+	}
+
+	log.Printf("[tryPyMuPDFParsing] Attempting PyMuPDF4LLM extraction - file size: %d bytes", len(content))
+
+	parseResp, err := mlClient.ParseDocumentPyMuPDF(content, "document.pdf")
+	if err != nil {
+		return "", fmt.Errorf("PyMuPDF extraction failed: %w", err)
+	}
+
+	log.Printf("[tryPyMuPDFParsing] Successfully parsed: %d pages, %d chars (%dms)",
+		parseResp.PageCount, len(parseResp.Markdown), parseResp.ProcessingTimeMS)
+
+	// Use markdown output for better LLM consumption
+	return parseResp.Markdown, nil
+}
+
+// extract human-readable text from a given pdf with hybrid approach: try ML Worker (Docling) -> PyMuPDF4LLM -> docconv -> OCR
 func ExtractTextFromPDF(f multipart.File, fileSize int64) (string, error) {
 	// Reset the file reader's position
 	_, err := f.Seek(0, io.SeekStart)
@@ -440,6 +341,16 @@ func ExtractTextFromPDF(f multipart.File, fileSize int64) (string, error) {
 		log.Printf("[ExtractTextFromPDF] ML Worker parsing unavailable: %v", err)
 	}
 
+	// Try PyMuPDF4LLM as second option (better than docconv)
+	text, err = tryPyMuPDFParsing(content)
+	if err == nil && !isTextExtractionPoor(text) {
+		log.Printf("[ExtractTextFromPDF] PyMuPDF4LLM extraction successful: %d characters", len(text))
+		return text, nil
+	}
+	if err != nil {
+		log.Printf("[ExtractTextFromPDF] PyMuPDF4LLM unavailable: %v", err)
+	}
+
 	// Reset file position for docconv
 	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
@@ -450,14 +361,56 @@ func ExtractTextFromPDF(f multipart.File, fileSize int64) (string, error) {
 	log.Println("[ExtractTextFromPDF] Attempting fast text extraction (docconv)")
 	bodyResult, _, err := docconv.ConvertPDF(f)
 
-	// If extraction succeeded and quality is good, use it
-	if err == nil && !isTextExtractionPoor(bodyResult) {
+	// Log what we got
+	if err != nil {
+		log.Printf("[ExtractTextFromPDF] Docconv failed: %v", err)
+	} else {
+		log.Printf("[ExtractTextFromPDF] Docconv extracted %d characters", len(bodyResult))
+		isPoor := isTextExtractionPoor(bodyResult)
+		log.Printf("[ExtractTextFromPDF] Quality check: isPoor=%v", isPoor)
+
+		// If extraction succeeded and quality is good, use it
+		if !isPoor {
+			text := strings.TrimSpace(bodyResult)
+			log.Printf("[ExtractTextFromPDF] Fast extraction successful: %d characters", len(text))
+			return text, nil
+		}
+
+		// Quality is poor - try OCR before accepting poor quality text
+		log.Println("[ExtractTextFromPDF] Docconv text quality is poor, trying ML Worker OCR")
+
+		// Reset file position for OCR
+		_, err = f.Seek(0, io.SeekStart)
+		if err != nil {
+			// Can't reset file, use poor quality docconv text as fallback
+			text := strings.TrimSpace(bodyResult)
+			if len(text) > 0 {
+				log.Printf("[ExtractTextFromPDF] File seek failed, using docconv text: %d characters", len(text))
+				return text, nil
+			}
+			return "", fmt.Errorf("file seek error: %v", err)
+		}
+
+		ocrText, ocrErr := extractTextWithOCRLocal(f)
+		if ocrErr == nil && !isTextExtractionPoor(ocrText) {
+			log.Printf("[ExtractTextFromPDF] ML Worker OCR successful: %d characters", len(ocrText))
+			return ocrText, nil
+		}
+
+		if ocrErr != nil {
+			log.Printf("[ExtractTextFromPDF] ML Worker OCR failed: %v", ocrErr)
+		} else {
+			log.Printf("[ExtractTextFromPDF] ML Worker OCR text also poor quality")
+		}
+
+		// OCR didn't work, use docconv text as last resort
 		text := strings.TrimSpace(bodyResult)
-		log.Printf("[ExtractTextFromPDF] Fast extraction successful: %d characters", len(text))
-		return text, nil
+		if len(text) > 0 {
+			log.Printf("[ExtractTextFromPDF] Using docconv text as last resort: %d characters", len(text))
+			return text, nil
+		}
 	}
 
-	// Text extraction failed or quality is poor - use OCR
-	log.Println("[ExtractTextFromPDF] Text extraction poor or failed, falling back to OCR")
-	return extractTextWithOCR(f)
+	// Text extraction completely failed - return error
+	return "", fmt.Errorf("all extraction methods failed")
 }

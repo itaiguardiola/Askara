@@ -1,12 +1,13 @@
 module github.com/itaiguardiola/askara
 
-go 1.17
+go 1.21
 
 require (
 	code.sajari.com/docconv v1.3.5
 	github.com/codegangsta/negroni v1.0.0
 	github.com/gabriel-vasile/mimetype v1.4.2
 	github.com/gen2brain/go-fitz v1.22.2
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/schema v1.2.0
 	github.com/neurosnap/sentences v1.1.2
@@ -28,12 +29,10 @@ require (
 	github.com/fatih/set v0.2.1 // indirect
 	github.com/gigawattio/window v0.0.0-20180317192513-0f5467e35573 // indirect
 	github.com/go-resty/resty/v2 v2.3.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/jaytaylor/html2text v0.0.0-20200412013138-3577fbdbcff7 // indirect
 	github.com/levigross/exp-html v0.0.0-20120902181939-8df60c69a8f5 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
-	github.com/otiai10/gosseract/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/richardlehane/mscfb v1.0.3 // indirect
 	github.com/richardlehane/msoleps v1.0.3 // indirect

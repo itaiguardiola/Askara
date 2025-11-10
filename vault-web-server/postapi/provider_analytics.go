@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-
-	"github.com/itaiguardiola/askara/llm"
+	"time"
 )
 
 // ProviderStatsResponse represents provider statistics for the API
@@ -213,7 +212,7 @@ func (ctx *HandlerContext) GetProviderHealthHandler(w http.ResponseWriter, r *ht
 	response := map[string]interface{}{
 		"providers": healthStatus,
 		"mode":      string(ctx.providerManager.GetMode()),
-		"timestamp": llm.MetricsCollector{}.GetRecentMetrics(0), // Current time
+		"timestamp": time.Now().Unix(), // Current time
 	}
 
 	w.Header().Set("Content-Type", "application/json")

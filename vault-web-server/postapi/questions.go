@@ -78,7 +78,7 @@ func (ctx *HandlerContext) QuestionHandler(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Use hybrid search (vector + FTS) instead of just vector search
-		matches, err := ctx.vectorDB.HybridSearch(queryEmbedding, query, 4, form.UUID)
+		matches, err := ctx.vectorDB.HybridSearch(queryEmbedding, query, 8, form.UUID)
 		if err != nil {
 			log.Printf("[QuestionHandler WARN] Hybrid search failed for query %d: %v", i, err)
 			continue
@@ -268,7 +268,7 @@ func (ctx *HandlerContext) StreamingQuestionHandler(w http.ResponseWriter, r *ht
 		}
 
 		// Use hybrid search (vector + FTS) instead of just vector search
-		matches, err := ctx.vectorDB.HybridSearch(queryEmbedding, query, 4, form.UUID)
+		matches, err := ctx.vectorDB.HybridSearch(queryEmbedding, query, 8, form.UUID)
 		if err != nil {
 			log.Printf("[StreamingQuestionHandler WARN] Hybrid search failed for query %d: %v", i, err)
 			continue

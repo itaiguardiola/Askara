@@ -138,6 +138,15 @@ export default function App() {
     }
   };
 
+  const handleChatDocument = (doc: Document) => {
+    // Select the document if not already selected
+    setSelectedDocuments((prev) =>
+      prev.includes(doc.id) ? prev : [...prev, doc.id],
+    );
+    // Switch to chat tab
+    setActiveTab("chat");
+  };
+
   const getSelectedDocs = () =>
     documents.filter((doc) =>
       selectedDocuments.includes(doc.id),
@@ -145,14 +154,14 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <header className="border-b p-4 flex items-center justify-between bg-card">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-            <MessageSquare className="h-6 w-6 text-primary-foreground" />
+      <header className="border-b p-2 flex items-center justify-between bg-card">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+            <MessageSquare className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="leading-none">Askara</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-base leading-none">Askara</h1>
+            <p className="text-xs text-muted-foreground">
               Document Q&A Assistant
             </p>
           </div>
@@ -216,13 +225,13 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-hidden p-4">
+      <main className="flex-1 overflow-hidden p-2">
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="h-full flex flex-col"
         >
-          <TabsList className="w-full grid grid-cols-3 mb-4">
+          <TabsList className="w-full grid grid-cols-3 mb-2">
             <TabsTrigger value="upload" className="gap-2">
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">Upload</span>
@@ -259,6 +268,7 @@ export default function App() {
                 onSelectDocument={handleSelectDocument}
                 onDeleteDocument={handleDeleteDocument}
                 onViewDocument={setViewingDocument}
+                onChatDocument={handleChatDocument}
               />
             </TabsContent>
 

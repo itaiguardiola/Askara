@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, FileText, Calendar, Trash2, Eye } from 'lucide-react';
+import { Search, FileText, Calendar, Trash2, Eye, MessageCircle } from 'lucide-react';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -31,6 +31,7 @@ interface DocumentLibraryProps {
   onSelectDocument: (id: string) => void;
   onDeleteDocument: (id: string) => void;
   onViewDocument?: (document: Document) => void;
+  onChatDocument?: (document: Document) => void;
 }
 
 export function DocumentLibrary({
@@ -39,6 +40,7 @@ export function DocumentLibrary({
   onSelectDocument,
   onDeleteDocument,
   onViewDocument,
+  onChatDocument,
 }: DocumentLibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -129,6 +131,20 @@ export function DocumentLibrary({
                             title="View document"
                           >
                             <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onChatDocument && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onChatDocument(doc);
+                            }}
+                            className="h-8 w-8"
+                            title="Chat with this document"
+                          >
+                            <MessageCircle className="h-4 w-4" />
                           </Button>
                         )}
                         <Button

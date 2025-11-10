@@ -12,6 +12,9 @@ services:
     environment:
       # LLM Provider Selection
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_PROVIDER_MODE=${LLM_PROVIDER_MODE:-single}
+      - LLM_METRICS_ENABLED=${LLM_METRICS_ENABLED:-true}
+      - LLM_METRICS_PATH=${LLM_METRICS_PATH:-./data/llm_metrics.json}
 
       # OpenAI Configuration (only needed if LLM_PROVIDER=openai)
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -38,10 +41,14 @@ services:
       - ML_WORKER_ENABLED=${ML_WORKER_ENABLED:-false}
       - ML_WORKER_ENDPOINT=${ML_WORKER_ENDPOINT:-http://192.168.0.250:6161/askara}
       - ML_WORKER_FEATURES=${ML_WORKER_FEATURES:-ocr,enhance,caption}
-      - ML_WORKER_TIMEOUT=${ML_WORKER_TIMEOUT:-30}
+      - ML_WORKER_TIMEOUT=${ML_WORKER_TIMEOUT:-120}
 
       # Query Rewriting (optional, uses local Ollama)
       - QUERY_REWRITE_ENABLED=${QUERY_REWRITE_ENABLED:-false}
+
+      # Code Source of Truth (optional, enhanced code grounding)
+      - CODE_TRUST_ENABLED=${CODE_TRUST_ENABLED:-true}
+      - CODE_TRUST_PATH=${CODE_TRUST_PATH:-./data/code_trust.json}
 
     volumes:
       # Persist document data

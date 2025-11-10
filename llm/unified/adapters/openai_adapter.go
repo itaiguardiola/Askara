@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/itaiguardiola/Askara/llm"
-	"github.com/itaiguardiola/Askara/llm/unified"
+	"github.com/itaiguardiola/askara/llm"
+	"github.com/itaiguardiola/askara/llm/unified"
 )
 
 // OpenAIAdapter wraps the existing OpenAIProvider to implement UnifiedProvider

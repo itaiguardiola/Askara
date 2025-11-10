@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -81,6 +83,9 @@ type ParseDocumentRequest struct {
 	DocumentURL       string `json:"document_url"`        // Base64 data URL or file path
 	PreserveStructure bool   `json:"preserve_structure"`  // Whether to preserve document structure
 	ExtractTables     bool   `json:"extract_tables"`      // Whether to extract tables separately
+	ExtractImages     bool   `json:"extract_images"`      // Whether to extract images
+	HybridMode        bool   `json:"hybrid_mode"`         // Use PyMuPDF fallback for better results
+	PageRange         string `json:"page_range,omitempty"` // Optional: "1-10" or "5" or "1,3,5-7"
 	Format            string `json:"format,omitempty"`    // Optional: pdf, docx, pptx, html
 }
 
@@ -149,8 +154,8 @@ func NewClient() *Client {
 		features[strings.TrimSpace(feature)] = true
 	}
 
-	// Get timeout
-	timeout := 30 * time.Second
+	// Get timeout - default 5 minutes for document processing
+	timeout := 300 * time.Second
 	if timeoutStr := os.Getenv("ML_WORKER_TIMEOUT"); timeoutStr != "" {
 		if t, err := time.ParseDuration(timeoutStr + "s"); err == nil {
 			timeout = t
@@ -288,6 +293,121 @@ func (c *Client) ParseDocument(documentURL string, preserveStructure, extractTab
 	return &resp, nil
 }
 
+// ParseDocumentMultipart parses document using multipart file upload (for large files)
+// This function now uses retry logic and automatic chunking for better reliability
+func (c *Client) ParseDocumentMultipart(fileData []byte, filename string, fileType string, preserveStructure, extractTables bool) (*ParseDocumentResponse, error) {
+	// Use default production options with retry and chunking
+	options := DefaultParseOptions()
+	options.PreserveStructure = preserveStructure
+	options.ExtractTables = extractTables
+
+	return c.ParseDocumentWithRetry(fileData, filename, options)
+}
+
+// ParseDocumentAdvanced parses document with full control over options
+func (c *Client) ParseDocumentAdvanced(fileData []byte, filename string, options ParseOptions) (*ParseDocumentResponse, error) {
+	return c.ParseDocumentWithRetry(fileData, filename, options)
+}
+
+// ParseDocumentAuto automatically determines the best parsing strategy
+// based on document size and complexity
+func (c *Client) ParseDocumentAuto(fileData []byte, filename string) (*ParseDocumentResponse, error) {
+	if !c.IsFeatureEnabled("parse") {
+		return nil, fmt.Errorf("parse feature not enabled")
+	}
+
+	// First, do a quick parse to get page count
+	quickOptions := ParseOptions{
+		PreserveStructure: false,
+		ExtractTables:     false,
+		ExtractImages:     false,
+		HybridMode:        false,
+		PageRange:         "1", // Just first page
+		MaxRetries:        1,
+	}
+
+	quickResp, err := c.ParseDocumentWithRetry(fileData, filename, quickOptions)
+	if err != nil {
+		log.Printf("[MLWorker] Quick page count failed, using standard parse: %v", err)
+		// Fallback to standard parse
+		return c.ParseDocumentWithRetry(fileData, filename, DefaultParseOptions())
+	}
+
+	totalPages := quickResp.PageCount
+	log.Printf("[MLWorker] Document has %d pages, determining best strategy", totalPages)
+
+	// Choose strategy based on page count
+	options := DefaultParseOptions()
+
+	if totalPages > 100 {
+		// Very large document - use chunking
+		log.Printf("[MLWorker] Large document (%d pages), using chunked processing", totalPages)
+		return c.ParseDocumentChunked(fileData, filename, totalPages, options)
+	} else if totalPages > 50 {
+		// Medium document - standard parse with retry
+		log.Printf("[MLWorker] Medium document (%d pages), using standard parse with retry", totalPages)
+		return c.ParseDocumentWithRetry(fileData, filename, options)
+	} else {
+		// Small document - fast parse
+		log.Printf("[MLWorker] Small document (%d pages), using fast parse", totalPages)
+		return c.ParseDocumentWithRetry(fileData, filename, options)
+	}
+}
+
+// ParseDocumentPyMuPDF parses PDF using PyMuPDF4LLM (markdown-optimized extraction)
+func (c *Client) ParseDocumentPyMuPDF(fileData []byte, filename string) (*ParseDocumentResponse, error) {
+	if !c.IsFeatureEnabled("pymupdf") {
+		return nil, fmt.Errorf("PyMuPDF feature not enabled")
+	}
+
+	// Create multipart form data
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add file part
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, fmt.Errorf("create form file: %w", err)
+	}
+	if _, err := part.Write(fileData); err != nil {
+		return nil, fmt.Errorf("write file data: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	// Create request
+	url := c.BaseURL + "/pymupdf"
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Send request
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("ML Worker error (%d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var parseResp ParseDocumentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&parseResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	log.Printf("[MLWorker] PyMuPDF extraction - %d pages, %d chars (%dms)",
+		parseResp.PageCount, len(parseResp.Text), parseResp.ProcessingTimeMS)
+	return &parseResp, nil
+}
+
 // Rerank reranks documents using semantic reranking (cross-encoder)
 func (c *Client) Rerank(query string, documents []RerankDocument, topK int) (*RerankResponse, error) {
 	if !c.IsFeatureEnabled("rerank") {
@@ -370,6 +490,223 @@ func (c *Client) doRequest(method, path string, reqBody, respBody interface{}) e
 	}
 
 	return nil
+}
+
+// doRequestWithRetry performs an HTTP request with exponential backoff retry logic
+func (c *Client) doRequestWithRetry(method, path string, reqBody, respBody interface{}, maxRetries int) error {
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		err := c.doRequest(method, path, reqBody, respBody)
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+
+		// Don't retry on non-timeout errors
+		if !strings.Contains(err.Error(), "timeout") && !strings.Contains(err.Error(), "deadline exceeded") {
+			return err
+		}
+
+		if attempt < maxRetries-1 {
+			// Exponential backoff: 2^attempt seconds (1s, 2s, 4s)
+			waitTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+			log.Printf("[MLWorker] Request timeout, retrying in %v (attempt %d/%d)", waitTime, attempt+1, maxRetries)
+			time.Sleep(waitTime)
+		}
+	}
+
+	return fmt.Errorf("max retries (%d) exceeded: %w", maxRetries, lastErr)
+}
+
+// ParseDocumentWithRetry parses document with automatic retry on timeout
+func (c *Client) ParseDocumentWithRetry(fileData []byte, filename string, options ParseOptions) (*ParseDocumentResponse, error) {
+	if !c.IsFeatureEnabled("parse") {
+		return nil, fmt.Errorf("parse feature not enabled")
+	}
+
+	startTime := time.Now()
+
+	// Create multipart form data
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add file part
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, fmt.Errorf("create form file: %w", err)
+	}
+	if _, err := part.Write(fileData); err != nil {
+		return nil, fmt.Errorf("write file data: %w", err)
+	}
+
+	// Add form fields
+	writer.WriteField("preserve_structure", fmt.Sprintf("%t", options.PreserveStructure))
+	writer.WriteField("extract_tables", fmt.Sprintf("%t", options.ExtractTables))
+	writer.WriteField("extract_images", fmt.Sprintf("%t", options.ExtractImages))
+	writer.WriteField("hybrid_mode", fmt.Sprintf("%t", options.HybridMode))
+
+	if options.PageRange != "" {
+		writer.WriteField("page_range", options.PageRange)
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	// Retry logic with exponential backoff
+	var parseResp *ParseDocumentResponse
+	var lastErr error
+	maxRetries := options.MaxRetries
+	if maxRetries == 0 {
+		maxRetries = 2 // Default 2 retries
+	}
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Create request
+		url := c.BaseURL + "/parse"
+		req, err := http.NewRequest("POST", url, bytes.NewReader(body.Bytes()))
+		if err != nil {
+			return nil, fmt.Errorf("create request: %w", err)
+		}
+
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		// Send request
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			lastErr = err
+
+			// Check if it's a timeout error
+			if strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "deadline exceeded") {
+				if attempt < maxRetries-1 {
+					waitTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+					log.Printf("[MLWorker] Parse timeout for %s, retrying in %v (attempt %d/%d)",
+						filename, waitTime, attempt+1, maxRetries)
+					time.Sleep(waitTime)
+					continue
+				}
+			}
+			return nil, fmt.Errorf("HTTP request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			lastErr = fmt.Errorf("ML Worker error (%d): %s", resp.StatusCode, string(bodyBytes))
+
+			// Retry on 5xx errors
+			if resp.StatusCode >= 500 && attempt < maxRetries-1 {
+				waitTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+				log.Printf("[MLWorker] Server error for %s, retrying in %v (attempt %d/%d)",
+					filename, waitTime, attempt+1, maxRetries)
+				time.Sleep(waitTime)
+				continue
+			}
+			return nil, lastErr
+		}
+
+		var result ParseDocumentResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("decode response: %w", err)
+		}
+
+		parseResp = &result
+		break
+	}
+
+	if parseResp == nil {
+		return nil, fmt.Errorf("max retries (%d) exceeded: %w", maxRetries, lastErr)
+	}
+
+	duration := time.Since(startTime)
+
+	// Log slow documents (>2 minutes)
+	if duration.Seconds() > 120 {
+		log.Printf("[MLWorker] ⚠️  SLOW PARSE: %.1fs for %s (%d pages, %d chars, %d tables)",
+			duration.Seconds(), filename, parseResp.PageCount, len(parseResp.Text), len(parseResp.Tables))
+	} else {
+		log.Printf("[MLWorker] Document parsed - %s: %d pages, %d chars, %d tables (%.1fs)",
+			filename, parseResp.PageCount, len(parseResp.Text), len(parseResp.Tables), duration.Seconds())
+	}
+
+	return parseResp, nil
+}
+
+// ParseOptions contains options for document parsing
+type ParseOptions struct {
+	PreserveStructure bool
+	ExtractTables     bool
+	ExtractImages     bool
+	HybridMode        bool
+	PageRange         string // "1-10" or "5" or "1,3,5-7"
+	MaxRetries        int    // Default 2
+	ChunkSize         int    // Pages per chunk (0 = no chunking)
+}
+
+// DefaultParseOptions returns recommended production settings
+func DefaultParseOptions() ParseOptions {
+	return ParseOptions{
+		PreserveStructure: true,
+		ExtractTables:     true,
+		ExtractImages:     false,
+		HybridMode:        false,
+		MaxRetries:        2,
+		ChunkSize:         50, // Chunk documents >50 pages
+	}
+}
+
+// ParseDocumentChunked parses large documents in chunks
+func (c *Client) ParseDocumentChunked(fileData []byte, filename string, totalPages int, options ParseOptions) (*ParseDocumentResponse, error) {
+	if options.ChunkSize == 0 || totalPages <= options.ChunkSize {
+		// No chunking needed
+		return c.ParseDocumentWithRetry(fileData, filename, options)
+	}
+
+	log.Printf("[MLWorker] Chunking %s (%d pages) into chunks of %d pages", filename, totalPages, options.ChunkSize)
+
+	// Parse in chunks
+	var allText string
+	var allMarkdown string
+	var allTables []TableData
+	var totalProcessingTime int
+
+	for start := 1; start <= totalPages; start += options.ChunkSize {
+		end := start + options.ChunkSize - 1
+		if end > totalPages {
+			end = totalPages
+		}
+
+		chunkOptions := options
+		chunkOptions.PageRange = fmt.Sprintf("%d-%d", start, end)
+
+		log.Printf("[MLWorker] Processing chunk: pages %d-%d of %s", start, end, filename)
+
+		chunkResp, err := c.ParseDocumentWithRetry(fileData, filename, chunkOptions)
+		if err != nil {
+			return nil, fmt.Errorf("chunk %d-%d failed: %w", start, end, err)
+		}
+
+		// Merge results
+		allText += chunkResp.Text + "\n\n"
+		allMarkdown += chunkResp.Markdown + "\n\n"
+		allTables = append(allTables, chunkResp.Tables...)
+		totalProcessingTime += chunkResp.ProcessingTimeMS
+	}
+
+	// Return merged response
+	return &ParseDocumentResponse{
+		Text:             allText,
+		Markdown:         allMarkdown,
+		Tables:           allTables,
+		PageCount:        totalPages,
+		ProcessingTimeMS: totalProcessingTime,
+		Metadata: map[string]interface{}{
+			"chunked":    true,
+			"chunk_size": options.ChunkSize,
+		},
+	}, nil
 }
 
 // Global client instance

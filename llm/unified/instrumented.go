@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/itaiguardiola/Askara/metrics"
+	"github.com/itaiguardiola/askara/metrics"
 )
 
 // InstrumentedProvider wraps any UnifiedProvider with automatic metrics collection

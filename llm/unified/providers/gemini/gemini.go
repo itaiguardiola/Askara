@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/itaiguardiola/Askara/llm/unified"
+	"github.com/itaiguardiola/askara/llm/unified"
 )
 
 // GeminiProvider implements the UnifiedProvider interface for Google Gemini

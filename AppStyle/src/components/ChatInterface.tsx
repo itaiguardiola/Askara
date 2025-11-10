@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, FileText, Sparkles, Download } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { ScrollArea } from './ui/scroll-area';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -100,6 +99,14 @@ export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
     }
   };
 
+  const handleSuggestedQuestion = (question: string) => {
+    setInput(question);
+    // Focus textarea after setting question
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  };
+
   const exportChat = () => {
     if (messages.length === 0) {
       toast.error('No messages to export');
@@ -144,12 +151,12 @@ export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="p-4 md:p-6 border-b flex-shrink-0">
+    <div className="flex flex-col h-full">
+      <div className="p-3 border-b flex-shrink-0">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h3>Ask Questions</h3>
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h3 className="text-sm">Ask Questions</h3>
           </div>
           {messages.length > 0 && (
             <Button
@@ -173,84 +180,91 @@ export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 overflow-y-auto" ref={scrollRef}>
-        <div className="space-y-4 max-w-3xl mx-auto p-4 md:p-6">
-          {messages.length === 0 ? (
-            <div>
-              <SuggestedQuestions onSelectQuestion={setInput} />
-              <div className="text-center py-12">
-                <Bot className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">
-                  Start a conversation by asking a question about your documents
-                </p>
+      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+        <div className="space-y-4 max-w-3xl mx-auto p-3">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center min-h-[300px] text-center">
+              <div className="mb-4 p-4 rounded-full bg-primary/10">
+                <Sparkles className="h-8 w-8 text-primary" />
               </div>
+              <h2 className="text-xl font-semibold mb-2">Welcome to Askara</h2>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Ask questions about your documents and get intelligent answers powered by AI
+              </p>
             </div>
-          ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
+          )}
+
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex gap-2 ${
+                message.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}
+            >
+              {message.role === 'assistant' && (
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    <Bot className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <Card
+                className={`p-2.5 max-w-[85%] md:max-w-[80%] ${
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : ''
                 }`}
               >
-                {message.role === 'assistant' && (
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      <Bot className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-                <Card
-                  className={`p-3 md:p-4 max-w-[85%] md:max-w-[75%] ${
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</p>
+                <p
+                  className={`text-xs mt-1.5 ${
                     message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : ''
+                      ? 'text-primary-foreground/70'
+                      : 'text-muted-foreground'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
-                  <p
-                    className={`text-xs mt-2 ${
-                      message.role === 'user'
-                        ? 'text-primary-foreground/70'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    {message.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </Card>
-                {message.role === 'user' && (
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarFallback>
-                      <User className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-              </div>
-            ))
-          )}
+                  {message.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </Card>
+              {message.role === 'user' && (
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarFallback>
+                    <User className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          ))}
+
           {isLoading && (
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Avatar className="h-8 w-8 flex-shrink-0">
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   <Bot className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
-              <Card className="p-4">
+              <Card className="p-2.5">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.4s]" />
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" />
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.4s]" />
                 </div>
               </Card>
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
-      <div className="p-4 md:p-6 border-t flex-shrink-0">
+      {messages.length === 0 && !isLoading && (
+        <div className="px-3 pb-2 flex-shrink-0">
+          <SuggestedQuestions onSelectQuestion={handleSuggestedQuestion} />
+        </div>
+      )}
+
+      <div className="p-3 border-t flex-shrink-0 bg-background">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Textarea
             ref={textareaRef}
@@ -258,19 +272,19 @@ export function ChatInterface({ selectedDocuments }: ChatInterfaceProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="min-h-[60px] max-h-[120px] resize-none flex-1"
+            className="min-h-[50px] max-h-[100px] resize-none flex-1 text-sm"
             disabled={isLoading}
           />
           <Button
             type="submit"
             size="icon"
             disabled={!input.trim() || isLoading}
-            className="h-[60px] w-[60px] flex-shrink-0"
+            className="h-[50px] w-[50px] flex-shrink-0"
           >
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4" />
           </Button>
         </form>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-muted-foreground mt-1.5">
           Press Enter to send, Shift+Enter for new line
         </p>
       </div>

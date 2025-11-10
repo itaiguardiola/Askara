@@ -4,9 +4,12 @@ logs
 *.log
 npm-debug.log*
 
-# private keys
-# /secret/
-# secret
+# Environment and Secrets
+.env
+.env.local
+.env.production
+secret/
+secrets/
 
 # Dependency directories
 node_modules
@@ -30,5 +33,30 @@ go.opencensus.io
 go.uber.org
 testfiles
 gopkg.in
+
+# Build artifacts
+vault-web-server.exe
+*.exe
+*.test
+
+# Data and storage
+data/
+storage/
+vectordb/
+
+# Backup folders
+*_OLD_BACKUP/
+*.bak
+
+# Test files
+test_*.txt
+test_*.ps1
+test_*.json
+temp_docs/
+
+# OS files
+nul
+Thumbs.db
+desktop.ini
 
 Dockerfile

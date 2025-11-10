@@ -154,6 +154,11 @@ func main() {
 	mx.HandleFunc("/api/codetrust/index", handlerContext.GetCodeTrustIndexHandler).Methods("GET")
 	mx.HandleFunc("/api/codetrust/enrichment/{documentId}", handlerContext.GetDocumentEnrichmentHandler).Methods("GET")
 
+	// Feedback endpoints
+	mx.HandleFunc("/api/feedback", handlerContext.SubmitFeedbackHandler).Methods("POST")
+	mx.HandleFunc("/api/feedback", handlerContext.ListFeedbackHandler).Methods("GET")
+	mx.HandleFunc("/api/feedback/{id}", handlerContext.GetFeedbackHandler).Methods("GET")
+
 	// Path Routing Rules: [DELETE]
 	mx.HandleFunc("/api/documents/{documentId}", handlerContext.DeleteDocumentHandler).Methods("DELETE")
 

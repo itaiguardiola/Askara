@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/itaiguardiola/Askara/llm"
-	"github.com/itaiguardiola/Askara/llm/unified"
+	"github.com/itaiguardiola/askara/llm"
+	"github.com/itaiguardiola/askara/llm/unified"
 )
 
 // OllamaAdapter wraps the existing OllamaProvider to implement UnifiedProvider
