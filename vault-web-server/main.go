@@ -163,6 +163,11 @@ func main() {
 	mx.HandleFunc("/api/feedback", handlerContext.ListFeedbackHandler).Methods("GET")
 	mx.HandleFunc("/api/feedback/{id}", handlerContext.GetFeedbackHandler).Methods("GET")
 
+	// Provider Analytics Endpoints
+	mx.HandleFunc("/api/providers/stats", handlerContext.GetProviderStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/metrics", handlerContext.GetRecentMetricsHandler).Methods("GET")
+	mx.HandleFunc("/api/providers/health", handlerContext.GetProviderHealthHandler).Methods("GET")
+
 	// Path Routing Rules: [PUT]
 	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.UpdateMetadata).Methods("PUT")
 

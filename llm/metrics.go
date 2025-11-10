@@ -12,49 +12,49 @@ import (
 type MetricType string
 
 const (
-	MetricTypeEmbedding   MetricType = "embedding"
-	MetricTypeCompletion  MetricType = "completion"
-	MetricTypeStreaming   MetricType = "streaming"
+	MetricTypeEmbedding  MetricType = "embedding"
+	MetricTypeCompletion MetricType = "completion"
+	MetricTypeStreaming  MetricType = "streaming"
 )
 
 // ProviderMetric represents a single metric data point
 type ProviderMetric struct {
-	Provider      ProviderType  `json:"provider"`
-	MetricType    MetricType    `json:"metric_type"`
-	Timestamp     time.Time     `json:"timestamp"`
-	LatencyMs     int64         `json:"latency_ms"`
-	Success       bool          `json:"success"`
-	ErrorMessage  string        `json:"error_message,omitempty"`
-	TokensInput   int           `json:"tokens_input,omitempty"`
-	TokensOutput  int           `json:"tokens_output,omitempty"`
-	Model         string        `json:"model,omitempty"`
-	CostEstimate  float64       `json:"cost_estimate,omitempty"`
+	Provider     ProviderType `json:"provider"`
+	MetricType   MetricType   `json:"metric_type"`
+	Timestamp    time.Time    `json:"timestamp"`
+	LatencyMs    int64        `json:"latency_ms"`
+	Success      bool         `json:"success"`
+	ErrorMessage string       `json:"error_message,omitempty"`
+	TokensInput  int          `json:"tokens_input,omitempty"`
+	TokensOutput int          `json:"tokens_output,omitempty"`
+	Model        string       `json:"model,omitempty"`
+	CostEstimate float64      `json:"cost_estimate,omitempty"`
 }
 
 // ProviderStats represents aggregated statistics for a provider
 type ProviderStats struct {
-	Provider         ProviderType  `json:"provider"`
-	TotalRequests    int64         `json:"total_requests"`
-	SuccessfulReqs   int64         `json:"successful_requests"`
-	FailedReqs       int64         `json:"failed_requests"`
-	SuccessRate      float64       `json:"success_rate"`
-	AvgLatencyMs     float64       `json:"avg_latency_ms"`
-	P95LatencyMs     float64       `json:"p95_latency_ms"`
-	P99LatencyMs     float64       `json:"p99_latency_ms"`
-	TotalTokensIn    int64         `json:"total_tokens_in"`
-	TotalTokensOut   int64         `json:"total_tokens_out"`
-	TotalCost        float64       `json:"total_cost"`
-	LastSuccess      *time.Time    `json:"last_success,omitempty"`
-	LastFailure      *time.Time    `json:"last_failure,omitempty"`
-	IsHealthy        bool          `json:"is_healthy"`
-	HealthScore      float64       `json:"health_score"` // 0-100
+	Provider       ProviderType `json:"provider"`
+	TotalRequests  int64        `json:"total_requests"`
+	SuccessfulReqs int64        `json:"successful_requests"`
+	FailedReqs     int64        `json:"failed_requests"`
+	SuccessRate    float64      `json:"success_rate"`
+	AvgLatencyMs   float64      `json:"avg_latency_ms"`
+	P95LatencyMs   float64      `json:"p95_latency_ms"`
+	P99LatencyMs   float64      `json:"p99_latency_ms"`
+	TotalTokensIn  int64        `json:"total_tokens_in"`
+	TotalTokensOut int64        `json:"total_tokens_out"`
+	TotalCost      float64      `json:"total_cost"`
+	LastSuccess    *time.Time   `json:"last_success,omitempty"`
+	LastFailure    *time.Time   `json:"last_failure,omitempty"`
+	IsHealthy      bool         `json:"is_healthy"`
+	HealthScore    float64      `json:"health_score"` // 0-100
 }
 
 // MetricsCollector collects and aggregates provider metrics
 type MetricsCollector struct {
-	metrics        []ProviderMetric
-	mutex          sync.RWMutex
-	maxMetrics     int
+	metrics         []ProviderMetric
+	mutex           sync.RWMutex
+	maxMetrics      int
 	persistencePath string
 
 	// Stats cache

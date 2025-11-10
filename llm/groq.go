@@ -116,7 +116,7 @@ func (g *GroqProvider) StreamCompletion(prompt string, contextTexts []string, on
 }
 
 // buildMessages constructs the messages array for Groq API (OpenAI format)
-func (g *GroqProvider) buildMessages(prompt string, context []string) []openai.ChatCompletionMessage {
+func (g *GroqProvider) buildMessages(prompt string, contextTexts []string) []openai.ChatCompletionMessage {
 	messages := []openai.ChatCompletionMessage{}
 
 	// Add system instruction if configured
@@ -128,9 +128,9 @@ func (g *GroqProvider) buildMessages(prompt string, context []string) []openai.C
 	}
 
 	// Add context if provided
-	if len(context) > 0 {
+	if len(contextTexts) > 0 {
 		contextStr := "Here is the relevant context:\n\n"
-		for i, ctx := range context {
+		for i, ctx := range contextTexts {
 			contextStr += fmt.Sprintf("Context %d:\n%s\n\n", i+1, ctx)
 		}
 
