@@ -130,7 +130,7 @@ func (o *OllamaProvider) buildPromptWithContext(userPrompt string, contextTexts 
 	result := builder.Build(userPrompt, contextTexts)
 
 	log.Printf("[OllamaProvider] Using %s question type with temperature %.2f",
-		result.QuestionType.String(), result.Temperature)
+		result.QuestionType.String(), result.Config.Temperature)
 
 	// For Ollama, we combine system prompt and user prompt since it doesn't have separate system messages
 	// We'll prepend system instructions as context

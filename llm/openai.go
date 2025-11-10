@@ -79,7 +79,7 @@ func (o *OpenAIProvider) buildPromptWithContext(userPrompt string, contextTexts 
 	result := builder.Build(userPrompt, contextTexts)
 
 	log.Printf("[OpenAIProvider] Using %s question type with temperature %.2f",
-		result.QuestionType.String(), result.Temperature)
+		result.QuestionType.String(), result.Config.Temperature)
 
 	return result.FinalPrompt, result.SystemPrompt
 }
