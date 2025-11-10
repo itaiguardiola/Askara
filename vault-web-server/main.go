@@ -140,10 +140,14 @@ func main() {
 	mx.HandleFunc("/upload", handlerContext.UploadHandler).Methods("POST")
 	mx.HandleFunc("/api/config/test", handlerContext.TestConnectionHandler).Methods("POST")
 	mx.HandleFunc("/api/codetrust/ground", handlerContext.GroundQueryHandler).Methods("POST")
+	mx.HandleFunc("/api/documents/search/tags", handlerContext.SearchByTags).Methods("POST")
+	mx.HandleFunc("/api/documents/{documentId}/tags", handlerContext.AddTag).Methods("POST")
 
 	// Path Routing Rules: [GET]
 	mx.HandleFunc("/api/documents", handlerContext.ListDocumentsHandler).Methods("GET")
 	mx.HandleFunc("/api/documents/stats", handlerContext.GetDocumentStatsHandler).Methods("GET")
+	mx.HandleFunc("/api/documents/tags", handlerContext.GetAllTags).Methods("GET")
+	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.GetMetadata).Methods("GET")
 	mx.HandleFunc("/api/config", handlerContext.GetConfigHandler).Methods("GET")
 	mx.HandleFunc("/api/config/ollama/models", handlerContext.ListOllamaModelsHandler).Methods("GET")
 
@@ -159,8 +163,12 @@ func main() {
 	mx.HandleFunc("/api/feedback", handlerContext.ListFeedbackHandler).Methods("GET")
 	mx.HandleFunc("/api/feedback/{id}", handlerContext.GetFeedbackHandler).Methods("GET")
 
+	// Path Routing Rules: [PUT]
+	mx.HandleFunc("/api/documents/{documentId}/metadata", handlerContext.UpdateMetadata).Methods("PUT")
+
 	// Path Routing Rules: [DELETE]
 	mx.HandleFunc("/api/documents/{documentId}", handlerContext.DeleteDocumentHandler).Methods("DELETE")
+	mx.HandleFunc("/api/documents/{documentId}/tags/{tag}", handlerContext.RemoveTag).Methods("DELETE")
 
 	// Path Routing Rules: Static Handlers
 	mx.HandleFunc("/github", StaticRedirectHandler("https://github.com/pashpashpash/vault"))
