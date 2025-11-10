@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 
+	"github.com/itaiguardiola/askara/prompt"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -67,23 +67,21 @@ func (o *OpenAIProvider) GenerateEmbedding(text string) ([]float32, error) {
 	return resp.Data[0].Embedding, nil
 }
 
-// buildPromptWithContext creates a prompt that includes the provided context.
-func (o *OpenAIProvider) buildPromptWithContext(prompt string, contextTexts []string) string {
+// buildPromptWithContext creates an optimized prompt using the prompt builder package.
+func (o *OpenAIProvider) buildPromptWithContext(userPrompt string, contextTexts []string) (string, string) {
 	if len(contextTexts) == 0 {
-		return prompt
+		// No context, return simple prompt with default system instructions
+		return userPrompt, "You are a helpful assistant. Answer questions accurately and concisely."
 	}
 
-	var sb strings.Builder
-	sb.WriteString("Use the following context to answer the question:\n\n")
-	sb.WriteString("Context:\n")
-	for i, ctx := range contextTexts {
-		sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, ctx))
-	}
-	sb.WriteString("\n")
-	sb.WriteString("Question: ")
-	sb.WriteString(prompt)
+	// Use the prompt builder to create an optimized prompt
+	builder := prompt.NewBuilder()
+	result := builder.Build(userPrompt, contextTexts)
 
-	return sb.String()
+	log.Printf("[OpenAIProvider] Using %s question type with temperature %.2f",
+		result.QuestionType.String(), result.Temperature)
+
+	return result.FinalPrompt, result.SystemPrompt
 }
 
 // GenerateCompletion generates a completion for the given prompt with context using OpenAI.
@@ -92,12 +90,18 @@ func (o *OpenAIProvider) GenerateCompletion(prompt string, contextTexts []string
 		return "", fmt.Errorf("prompt cannot be empty")
 	}
 
-	fullPrompt := o.buildPromptWithContext(prompt, contextTexts)
+	fullPrompt, systemPrompt := o.buildPromptWithContext(prompt, contextTexts)
+
+	// Use custom system prompt if provided in config, otherwise use the generated one
+	systemInstructions := systemPrompt
+	if o.config.Instructions != "" {
+		systemInstructions = o.config.Instructions
+	}
 
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
-			Content: o.config.Instructions,
+			Content: systemInstructions,
 		},
 		{
 			Role:    openai.ChatMessageRoleUser,
@@ -142,12 +146,18 @@ func (o *OpenAIProvider) StreamCompletion(prompt string, contextTexts []string, 
 		return fmt.Errorf("onChunk callback cannot be nil")
 	}
 
-	fullPrompt := o.buildPromptWithContext(prompt, contextTexts)
+	fullPrompt, systemPrompt := o.buildPromptWithContext(prompt, contextTexts)
+
+	// Use custom system prompt if provided in config, otherwise use the generated one
+	systemInstructions := systemPrompt
+	if o.config.Instructions != "" {
+		systemInstructions = o.config.Instructions
+	}
 
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
-			Content: o.config.Instructions,
+			Content: systemInstructions,
 		},
 		{
 			Role:    openai.ChatMessageRoleUser,
